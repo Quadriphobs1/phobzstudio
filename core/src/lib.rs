@@ -102,6 +102,7 @@ mod python_bindings {
             mirror,
             glow,
             design_type,
+            use_gpu_fft: true,
         };
 
         // Create callback wrapper

@@ -3,8 +3,20 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use phobz_visualizer::audio::synth::{generate_sine, generate_test_beat, generate_white_noise};
 use phobz_visualizer::audio::{analyze_audio, detect_beats, SpectrumAnalyzer};
+use std::sync::Arc;
 
 const SAMPLE_RATE: u32 = 44100;
+
+fn create_gpu_context() -> Option<(Arc<wgpu::Device>, Arc<wgpu::Queue>)> {
+    let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
+    let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
+        power_preference: wgpu::PowerPreference::HighPerformance,
+        ..Default::default()
+    })).ok()?;
+    let (device, queue) =
+        pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default())).ok()?;
+    Some((Arc::new(device), Arc::new(queue)))
+}
 
 fn bench_fft_analysis(c: &mut Criterion) {
     let mut group = c.benchmark_group("FFT Analysis");
@@ -117,6 +129,97 @@ fn bench_synth_generation(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_gpu_fft_analysis(c: &mut Criterion) {
+    let Some((device, queue)) = create_gpu_context() else {
+        eprintln!("Skipping GPU FFT benchmarks: no GPU available");
+        return;
+    };
+
+    let mut group = c.benchmark_group("GPU FFT Analysis");
+
+    for fft_size in [512, 1024, 2048, 4096] {
+        let samples = generate_sine(1000.0, SAMPLE_RATE, 1.0, 1.0);
+
+        let analyzer =
+            phobz_visualizer::gpu::GpuFftAnalyzer::new(device.clone(), queue.clone(), fft_size)
+                .expect("Failed to create GPU FFT analyzer");
+
+        group.throughput(Throughput::Elements(fft_size as u64));
+        group.bench_with_input(
+            BenchmarkId::new("gpu_analyze", fft_size),
+            &fft_size,
+            |b, _| {
+                b.iter(|| {
+                    black_box(analyzer.analyze(&samples).unwrap());
+                });
+            },
+        );
+    }
+
+    group.finish();
+}
+
+fn bench_gpu_spectrum_bands(c: &mut Criterion) {
+    let Some((device, queue)) = create_gpu_context() else {
+        eprintln!("Skipping GPU spectrum bands benchmarks: no GPU available");
+        return;
+    };
+
+    let mut group = c.benchmark_group("GPU Spectrum Bands");
+
+    let samples = generate_white_noise(SAMPLE_RATE, 1.0, 1.0, 42);
+    let analyzer =
+        phobz_visualizer::gpu::GpuFftAnalyzer::new(device.clone(), queue.clone(), 2048)
+            .expect("Failed to create GPU FFT analyzer");
+
+    for num_bands in [16, 32, 64, 128, 256, 512, 1024] {
+        group.bench_with_input(
+            BenchmarkId::new("gpu_analyze_bands", num_bands),
+            &num_bands,
+            |b, &bands| {
+                b.iter(|| {
+                    black_box(analyzer.analyze_bands(&samples, SAMPLE_RATE, bands).unwrap());
+                });
+            },
+        );
+    }
+
+    group.finish();
+}
+
+fn bench_cpu_vs_gpu_fft(c: &mut Criterion) {
+    let Some((device, queue)) = create_gpu_context() else {
+        eprintln!("Skipping CPU vs GPU comparison: no GPU available");
+        return;
+    };
+
+    let mut group = c.benchmark_group("CPU vs GPU FFT");
+    let fft_size = 2048;
+    let samples = generate_sine(1000.0, SAMPLE_RATE, 1.0, 1.0);
+
+    group.throughput(Throughput::Elements(fft_size as u64));
+
+    // CPU benchmark
+    group.bench_function("cpu_fft_2048", |b| {
+        let mut analyzer = SpectrumAnalyzer::new(fft_size);
+        b.iter(|| {
+            black_box(analyzer.analyze(&samples));
+        });
+    });
+
+    // GPU benchmark
+    group.bench_function("gpu_fft_2048", |b| {
+        let analyzer =
+            phobz_visualizer::gpu::GpuFftAnalyzer::new(device.clone(), queue.clone(), fft_size)
+                .expect("Failed to create GPU FFT analyzer");
+        b.iter(|| {
+            black_box(analyzer.analyze(&samples).unwrap());
+        });
+    });
+
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_fft_analysis,
@@ -124,5 +227,8 @@ criterion_group!(
     bench_beat_detection,
     bench_full_analysis,
     bench_synth_generation,
+    bench_gpu_fft_analysis,
+    bench_gpu_spectrum_bands,
+    bench_cpu_vs_gpu_fft,
 );
 criterion_main!(benches);

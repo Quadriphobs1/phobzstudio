@@ -1,8 +1,8 @@
 //! Full render pipeline combining audio, GPU, and video.
 
-use crate::audio::{load_audio, AudioAnalysis, AudioError, SpectrumAnalyzer};
+use crate::audio::{load_audio, AudioAnalysis, AudioError, DynamicAnalyzer, SpectrumAnalyze};
 use crate::designs::{default_params, BarsParams, DesignParams, DesignType};
-use crate::gpu::{DesignRenderConfig, DesignRenderer, GpuError, RenderConfig};
+use crate::gpu::{DesignRenderConfig, DesignRenderer, GpuContext, GpuError, RenderConfig};
 use crate::video::{VideoCodec, VideoConfig, VideoEncoder, VideoError};
 use std::path::Path;
 
@@ -21,6 +21,9 @@ pub struct PipelineConfig {
     pub mirror: bool,
     pub glow: bool,
     pub design_type: DesignType,
+    /// Use GPU-accelerated FFT for spectrum analysis.
+    /// When enabled, FFT computation happens on the GPU compute shaders.
+    pub use_gpu_fft: bool,
 }
 
 impl Default for PipelineConfig {
@@ -38,6 +41,7 @@ impl Default for PipelineConfig {
             mirror: false,
             glow: true,
             design_type: DesignType::Bars,
+            use_gpu_fft: false,
         }
     }
 }
@@ -148,8 +152,26 @@ pub async fn render_video<P: AsRef<Path>, Q: AsRef<Path>>(
     let total_frames = (audio.duration() * config.fps as f64).ceil() as usize;
     let samples_per_frame = audio.sample_rate as usize / config.fps as usize;
 
-    // Create spectrum analyzer
-    let mut analyzer = SpectrumAnalyzer::new(config.fft_size);
+    // Create GPU context (needed for both rendering and optionally GPU FFT)
+    let gpu_context = GpuContext::new().await?;
+
+    // Create spectrum analyzer (CPU or GPU based on config)
+    let mut analyzer: DynamicAnalyzer = if config.use_gpu_fft {
+        DynamicAnalyzer::gpu_with_fallback(
+            Some(gpu_context.device.clone()),
+            Some(gpu_context.queue.clone()),
+            config.fft_size,
+        )
+    } else {
+        DynamicAnalyzer::cpu(config.fft_size)
+    };
+
+    // Log which analyzer is being used
+    if analyzer.is_gpu() {
+        log::info!("Using GPU-accelerated FFT for spectrum analysis");
+    } else {
+        log::info!("Using CPU-based FFT for spectrum analysis");
+    }
 
     // Create GPU renderer using design system
     let renderer = DesignRenderer::new(config.to_design_render_config()).await?;
@@ -165,15 +187,19 @@ pub async fn render_video<P: AsRef<Path>, Q: AsRef<Path>>(
         let start_sample = frame_idx * samples_per_frame;
         let end_sample = (start_sample + config.fft_size).min(mono.len());
 
-        // Compute spectrum
+        // Compute spectrum using the unified analyzer interface
         let bar_heights = if start_sample < mono.len() {
             let samples = &mono[start_sample..end_sample.min(mono.len())];
             if samples.len() >= config.fft_size {
-                let spectrum =
-                    analyzer.analyze_bands(samples, audio.sample_rate, config.bar_count as usize);
-                // Normalize spectrum to 0-1 range
-                let max_val = spectrum.iter().cloned().fold(0.0f32, f32::max).max(0.001);
-                spectrum.iter().map(|&v| (v / max_val).min(1.0)).collect()
+                match analyzer.analyze_bands(samples, audio.sample_rate, config.bar_count as usize)
+                {
+                    Ok(spectrum) => {
+                        // Normalize spectrum to 0-1 range
+                        let max_val = spectrum.iter().cloned().fold(0.0f32, f32::max).max(0.001);
+                        spectrum.iter().map(|&v| (v / max_val).min(1.0)).collect()
+                    }
+                    Err(_) => vec![0.0; config.bar_count as usize],
+                }
             } else {
                 vec![0.0; config.bar_count as usize]
             }
@@ -211,6 +237,19 @@ pub async fn render_video<P: AsRef<Path>, Q: AsRef<Path>>(
     encoder.finish()?;
 
     Ok(())
+}
+
+/// Render visualization video with explicit GPU FFT enabled.
+///
+/// This is a convenience function that enables GPU-accelerated FFT processing.
+pub async fn render_video_gpu<P: AsRef<Path>, Q: AsRef<Path>>(
+    audio_path: P,
+    output_path: Q,
+    mut config: PipelineConfig,
+    progress_callback: Option<Box<dyn Fn(f32) + Send>>,
+) -> Result<(), PipelineError> {
+    config.use_gpu_fft = true;
+    render_video(audio_path, output_path, config, progress_callback).await
 }
 
 #[cfg(test)]

@@ -4,11 +4,15 @@ Audio waveform visualisation overlay generator
 
 ## Features
 
+- **GPU-Accelerated FFT**: Compute shaders for real-time spectrum analysis (Cooley-Tukey radix-2)
 - **Audio Analysis**: Load WAV, MP3, FLAC, AAC files with beat detection and BPM estimation
 - **GPU Rendering**: Metal-accelerated waveform visualization on macOS (Vulkan on Linux)
+- **Multiple Designs**: Bars, circular radial, circular ring, frame perimeter, and more
+- **Post-Processing**: Glow effects with blur shaders
 - **Video Export**: H.264 for social media, ProRes 4444 for transparent overlays, VP9 for web
 - **Platform Presets**: Export for YouTube, TikTok, Instagram Reels, and more
-- **Python CLI**: CLI for rendering videos
+- **Python CLI**: Simple command-line interface for rendering videos
+- **CPU Fallback**: Automatic fallback to RustFFT when GPU is unavailable
 
 ## Requirements
 
@@ -27,8 +31,35 @@ just build
 # Run tests
 just test
 
-# Render a video (after Python bindings are complete)
-phobz-viz render track.mp3 --platform youtube -o output.mp4
+# Render a video
+phobz-viz render track.mp3 -o output.mp4
+
+# With options
+phobz-viz render track.mp3 -o output.mp4 \
+  --platform tiktok \
+  --design circular-ring \
+  --bars 64 \
+  --glow \
+  --mirror \
+  --color "#00ff88"
+```
+
+## Design Types
+
+- `bars` - Traditional vertical bar visualization
+- `circular-radial` - Radial bars emanating from center
+- `circular-ring` - Ring of bars around a circle
+- `frame-perimeter` - Bars along the frame edges
+
+## Benchmarks
+
+```bash
+# Run all benchmarks
+just bench
+
+# Run specific benchmark group
+cargo bench --bench audio_bench -- "GPU FFT"
+cargo bench --bench audio_bench -- "CPU vs GPU"
 ```
 
 ## Development

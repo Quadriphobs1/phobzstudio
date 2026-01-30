@@ -13,6 +13,10 @@ crate-type = ["cdylib", "rlib"]
 [features]
 default = []
 python = ["pyo3"]
+# GPU-accelerated FFT using compute shaders (enables GpuFftAnalyzer)
+gpu-fft = []
+# Full ML features (future: beat detection, source separation)
+full-ml = ["gpu-fft"]
 
 [dependencies]
 # GPU Rendering

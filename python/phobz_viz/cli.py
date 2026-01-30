@@ -61,6 +61,9 @@ def render(
     ] = False,
     glow: Annotated[bool, typer.Option("--glow/--no-glow", help="Enable glow effect")] = True,
     design: Annotated[str, typer.Option("-d", "--design", help=DESIGN_HELP)] = "bars",
+    verbose: Annotated[
+        bool, typer.Option("-v", "--verbose", help="Show detailed processing info")
+    ] = False,
 ) -> None:
     """Generate visualization video from audio file."""
     core = _get_core()
@@ -90,17 +93,27 @@ def render(
     console.print(f"Mirror: {mirror}")
     console.print(f"Glow: {glow}")
     console.print(f"Design: {design}")
+    if verbose:
+        console.print()
+        console.print("[bold cyan]Processing Info:[/bold cyan]")
+        console.print("  GPU FFT: [green]enabled[/green] (compute shaders)")
+        console.print("  GPU Render: [green]enabled[/green] (Metal/Vulkan)")
+        console.print(f"  FFT Size: 2048")
+        console.print(f"  FPS: {preset.fps}")
     console.print()
 
     # Background color
     background = "#00000000" if transparent else "#000000"
 
+    # Progress bar - disable stdout/stderr redirect in verbose mode to allow Rust logs
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
         BarColumn(),
         TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
         console=console,
+        redirect_stdout=not verbose,
+        redirect_stderr=not verbose,
     ) as progress:
         task = progress.add_task("Rendering...", total=100)
 

@@ -41,11 +41,6 @@ pub fn uniform_spectrum(size: usize, value: f32) -> Vec<f32> {
     vec![value; size]
 }
 
-/// Generate a gradient spectrum (0.0 to ~1.0).
-pub fn gradient_spectrum(size: usize) -> Vec<f32> {
-    (0..size).map(|i| i as f32 / size as f32).collect()
-}
-
 /// Verify that a design generates vertices correctly.
 pub fn verify_design_generates_vertices(design_type: DesignType, spectrum_size: usize) {
     let design = create_design(design_type);
