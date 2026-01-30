@@ -1,0 +1,66 @@
+[package]
+name = "phobz-visualizer-core"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.81"
+description = "GPU-accelerated audio visualisation library with FFmpeg integration."
+repository = "https://github.com/Quadriphobs1/phobzstudio"
+
+[lib]
+name = "phobz_visualizer"
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = []
+python = ["pyo3"]
+
+[dependencies]
+# GPU Rendering
+wgpu = "28.0"
+pollster = "0.4"
+bytemuck = { version = "1.14", features = ["derive"] }
+
+# Audio Processing
+symphonia = { version = "0.5.5", features = ["mp3", "flac", "wav", "pcm", "aac"] }
+rustfft = "6.4"
+
+# Video Encoding (FFmpeg bindings)
+rsmpeg = { version = "0.18.0", features = ["link_system_ffmpeg", "ffmpeg8"] }
+
+# Python Bindings (optional, enabled when building with maturin)
+pyo3 = { version = "0.27.2", features = ["extension-module"], optional = true }
+
+# Image handling
+image = "0.25"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "2.0"
+
+# Logging
+log = "0.4"
+env_logger = "0.11"
+
+# Async runtime (for examples)
+tokio = { version = "1", features = ["macros", "rt-multi-thread"], optional = true }
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[example]]
+name = "render_synthetic"
+required-features = ["tokio"]
+
+[[bench]]
+name = "audio_bench"
+harness = false
+
+[[bench]]
+name = "render_bench"
+harness = false

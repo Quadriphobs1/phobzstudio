@@ -1,3 +1,20 @@
+# Rust
+target/
+Cargo.lock
+*.rs.bk
+
+# Nix
+result
+result-*
+.direnv/
+
+# Output files
+*.mp4
+*.mov
+*.webm
+*.png
+analysis.json
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -136,7 +153,7 @@ celerybeat.pid
 
 # Environments
 .env
-.envrc
+# .envrc is tracked for direnv
 .venv
 env/
 venv/
@@ -205,3 +222,5 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+*.DS_Store
+examples/*.mp3
