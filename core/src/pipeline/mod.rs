@@ -79,10 +79,10 @@ pub enum PipelineError {
     Io(#[from] std::io::Error),
 }
 
-/// Parse hex color to RGB floats.
+/// Parse hex color to RGB floats (accepts 6-char RGB or 8-char RGBA, alpha is ignored).
 pub fn parse_hex_color(hex: &str) -> Option<[f32; 3]> {
     let hex = hex.trim_start_matches('#');
-    if hex.len() != 6 {
+    if hex.len() != 6 && hex.len() != 8 {
         return None;
     }
     let r = u8::from_str_radix(&hex[0..2], 16).ok()? as f32 / 255.0;
@@ -196,6 +196,8 @@ mod tests {
         assert_eq!(parse_hex_color("#00ff88"), Some([0.0, 1.0, 136.0 / 255.0]));
         assert_eq!(parse_hex_color("ffffff"), Some([1.0, 1.0, 1.0]));
         assert_eq!(parse_hex_color("000000"), Some([0.0, 0.0, 0.0]));
+        assert_eq!(parse_hex_color("#00000000"), Some([0.0, 0.0, 0.0]));
+        assert_eq!(parse_hex_color("ffffffff"), Some([1.0, 1.0, 1.0]));
         assert_eq!(parse_hex_color("invalid"), None);
     }
 
