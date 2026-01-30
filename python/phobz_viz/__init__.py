@@ -19,8 +19,8 @@ __version__ = "0.1.0"
 # Import from Rust core if available
 try:
     from phobz_visualizer import analyze_audio as _analyze_audio
-    from phobz_visualizer import render_video as _render_video
     from phobz_visualizer import parse_color
+    from phobz_visualizer import render_video as _render_video
 
     def analyze_audio(audio_path: str) -> str:
         """Analyze audio file and return JSON analysis data.

@@ -8,7 +8,9 @@
 use super::layouts::{create_bloom_layout, create_blur_layout};
 use super::pipelines::{create_fullscreen_pipeline, create_pipeline_layout};
 use super::textures::RenderTarget;
-use wgpu::{BindGroupLayout, Buffer, Device, Queue, RenderPipeline, Sampler, TextureFormat, TextureView};
+use wgpu::{
+    BindGroupLayout, Buffer, Device, Queue, RenderPipeline, Sampler, TextureFormat, TextureView,
+};
 
 /// Uniform data for blur pass.
 #[repr(C)]
@@ -16,6 +18,12 @@ use wgpu::{BindGroupLayout, Buffer, Device, Queue, RenderPipeline, Sampler, Text
 struct BlurUniforms {
     direction: [f32; 2],
     texel_size: [f32; 2],
+}
+
+/// Input/output texture views for a blur pass.
+struct BlurPassViews<'a> {
+    input: &'a TextureView,
+    output: &'a TextureView,
 }
 
 /// Uniform data for bloom extraction/composition.
@@ -85,21 +93,58 @@ impl PostProcessPipeline {
         let bloom_bind_group_layout = create_bloom_layout(device);
 
         // Create pipeline layouts
-        let blur_pipeline_layout = create_pipeline_layout(device, "blur_pipeline_layout", &[&blur_bind_group_layout]);
-        let bloom_pipeline_layout = create_pipeline_layout(device, "bloom_pipeline_layout", &[&bloom_bind_group_layout]);
+        let blur_pipeline_layout =
+            create_pipeline_layout(device, "blur_pipeline_layout", &[&blur_bind_group_layout]);
+        let bloom_pipeline_layout =
+            create_pipeline_layout(device, "bloom_pipeline_layout", &[&bloom_bind_group_layout]);
 
         // Create pipelines
-        let blur_pipeline = create_fullscreen_pipeline(device, "blur_pipeline", &blur_pipeline_layout, &blur_shader, "fs_main", format);
-        let extract_pipeline = create_fullscreen_pipeline(device, "bloom_extract_pipeline", &bloom_pipeline_layout, &bloom_shader, "fs_extract", format);
-        let composite_pipeline = create_fullscreen_pipeline(device, "bloom_composite_pipeline", &bloom_pipeline_layout, &bloom_shader, "fs_composite", format);
+        let blur_pipeline = create_fullscreen_pipeline(
+            device,
+            "blur_pipeline",
+            &blur_pipeline_layout,
+            &blur_shader,
+            "fs_main",
+            format,
+        );
+        let extract_pipeline = create_fullscreen_pipeline(
+            device,
+            "bloom_extract_pipeline",
+            &bloom_pipeline_layout,
+            &bloom_shader,
+            "fs_extract",
+            format,
+        );
+        let composite_pipeline = create_fullscreen_pipeline(
+            device,
+            "bloom_composite_pipeline",
+            &bloom_pipeline_layout,
+            &bloom_shader,
+            "fs_composite",
+            format,
+        );
 
         // Create ping-pong render targets for blur
-        let bloom_target_a = RenderTarget::for_scene(device, "bloom_texture_a", config.width, config.height, format);
-        let bloom_target_b = RenderTarget::for_scene(device, "bloom_texture_b", config.width, config.height, format);
+        let bloom_target_a = RenderTarget::for_scene(
+            device,
+            "bloom_texture_a",
+            config.width,
+            config.height,
+            format,
+        );
+        let bloom_target_b = RenderTarget::for_scene(
+            device,
+            "bloom_texture_b",
+            config.width,
+            config.height,
+            format,
+        );
 
         // Create uniform buffers
-        let blur_uniform_buffer = Self::create_uniform_buffer::<BlurUniforms>(device, "blur_uniforms");
-        let bloom_uniform_buffer = Self::create_uniform_buffer::<BloomUniforms>(device, "bloom_uniforms");
+        let blur_uniform_buffer =
+            Self::create_uniform_buffer::<BlurUniforms>(device, "blur_uniforms");
+        let bloom_uniform_buffer =
+            Self::create_uniform_buffer::<BloomUniforms>(device, "bloom_uniforms");
 
         // Create sampler
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
@@ -138,38 +183,113 @@ impl PostProcessPipeline {
     }
 
     /// Apply bloom post-processing to the scene texture.
-    pub fn apply(&self, device: &Device, queue: &Queue, encoder: &mut wgpu::CommandEncoder, scene_view: &TextureView, output_view: &TextureView, beat_intensity: f32) {
+    pub fn apply(
+        &self,
+        device: &Device,
+        queue: &Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        scene_view: &TextureView,
+        output_view: &TextureView,
+        beat_intensity: f32,
+    ) {
         // Update bloom uniforms
-        queue.write_buffer(&self.bloom_uniform_buffer, 0, bytemuck::bytes_of(&BloomUniforms {
-            threshold: self.config.bloom_threshold,
-            intensity: self.config.bloom_intensity,
-            beat_intensity,
-            _padding: 0.0,
-        }));
+        queue.write_buffer(
+            &self.bloom_uniform_buffer,
+            0,
+            bytemuck::bytes_of(&BloomUniforms {
+                threshold: self.config.bloom_threshold,
+                intensity: self.config.bloom_intensity,
+                beat_intensity,
+                _padding: 0.0,
+            }),
+        );
 
         // Extract bright areas -> bloom_target_a
-        self.run_bloom_pass(device, encoder, &self.extract_pipeline, scene_view, scene_view, self.bloom_target_a.view());
+        self.run_bloom_pass(
+            device,
+            encoder,
+            &self.extract_pipeline,
+            scene_view,
+            scene_view,
+            self.bloom_target_a.view(),
+        );
 
         // Blur passes (ping-pong)
-        let texel_size = [1.0 / self.config.width as f32, 1.0 / self.config.height as f32];
+        let texel_size = [
+            1.0 / self.config.width as f32,
+            1.0 / self.config.height as f32,
+        ];
         for _ in 0..self.config.blur_passes {
-            self.run_blur_pass(device, queue, encoder, self.bloom_target_a.view(), self.bloom_target_b.view(), [1.0, 0.0], texel_size);
-            self.run_blur_pass(device, queue, encoder, self.bloom_target_b.view(), self.bloom_target_a.view(), [0.0, 1.0], texel_size);
+            // Horizontal blur pass
+            self.run_blur_pass(
+                device,
+                queue,
+                encoder,
+                BlurPassViews {
+                    input: self.bloom_target_a.view(),
+                    output: self.bloom_target_b.view(),
+                },
+                BlurUniforms {
+                    direction: [1.0, 0.0],
+                    texel_size,
+                },
+            );
+            // Vertical blur pass
+            self.run_blur_pass(
+                device,
+                queue,
+                encoder,
+                BlurPassViews {
+                    input: self.bloom_target_b.view(),
+                    output: self.bloom_target_a.view(),
+                },
+                BlurUniforms {
+                    direction: [0.0, 1.0],
+                    texel_size,
+                },
+            );
         }
 
         // Composite bloom with scene -> output
-        self.run_bloom_pass(device, encoder, &self.composite_pipeline, scene_view, self.bloom_target_a.view(), output_view);
+        self.run_bloom_pass(
+            device,
+            encoder,
+            &self.composite_pipeline,
+            scene_view,
+            self.bloom_target_a.view(),
+            output_view,
+        );
     }
 
-    fn run_bloom_pass(&self, device: &Device, encoder: &mut wgpu::CommandEncoder, pipeline: &RenderPipeline, scene_view: &TextureView, bloom_view: &TextureView, output_view: &TextureView) {
+    fn run_bloom_pass(
+        &self,
+        device: &Device,
+        encoder: &mut wgpu::CommandEncoder,
+        pipeline: &RenderPipeline,
+        scene_view: &TextureView,
+        bloom_view: &TextureView,
+        output_view: &TextureView,
+    ) {
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
             layout: &self.bloom_bind_group_layout,
             entries: &[
-                wgpu::BindGroupEntry { binding: 0, resource: self.bloom_uniform_buffer.as_entire_binding() },
-                wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(scene_view) },
-                wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(bloom_view) },
-                wgpu::BindGroupEntry { binding: 3, resource: wgpu::BindingResource::Sampler(&self.sampler) },
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: self.bloom_uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(scene_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(bloom_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::Sampler(&self.sampler),
+                },
             ],
         });
 
@@ -179,7 +299,10 @@ impl PostProcessPipeline {
                 view: output_view,
                 resolve_target: None,
                 depth_slice: None,
-                ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT), store: wgpu::StoreOp::Store },
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                    store: wgpu::StoreOp::Store,
+                },
             })],
             depth_stencil_attachment: None,
             timestamp_writes: None,
@@ -192,26 +315,45 @@ impl PostProcessPipeline {
         pass.draw(0..3, 0..1);
     }
 
-    fn run_blur_pass(&self, device: &Device, queue: &Queue, encoder: &mut wgpu::CommandEncoder, input_view: &TextureView, output_view: &TextureView, direction: [f32; 2], texel_size: [f32; 2]) {
-        queue.write_buffer(&self.blur_uniform_buffer, 0, bytemuck::bytes_of(&BlurUniforms { direction, texel_size }));
+    fn run_blur_pass(
+        &self,
+        device: &Device,
+        queue: &Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        views: BlurPassViews<'_>,
+        uniforms: BlurUniforms,
+    ) {
+        queue.write_buffer(&self.blur_uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
             layout: &self.blur_bind_group_layout,
             entries: &[
-                wgpu::BindGroupEntry { binding: 0, resource: self.blur_uniform_buffer.as_entire_binding() },
-                wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(input_view) },
-                wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::Sampler(&self.sampler) },
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: self.blur_uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(views.input),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::Sampler(&self.sampler),
+                },
             ],
         });
 
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: None,
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: output_view,
+                view: views.output,
                 resolve_target: None,
                 depth_slice: None,
-                ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT), store: wgpu::StoreOp::Store },
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                    store: wgpu::StoreOp::Store,
+                },
             })],
             depth_stencil_attachment: None,
             timestamp_writes: None,
@@ -241,6 +383,13 @@ mod tests {
             Err(_) => return,
         };
 
-        let _pipeline = PostProcessPipeline::new(&ctx.device, PostProcessConfig { width: 256, height: 256, ..Default::default() });
+        let _pipeline = PostProcessPipeline::new(
+            &ctx.device,
+            PostProcessConfig {
+                width: 256,
+                height: 256,
+                ..Default::default()
+            },
+        );
     }
 }

@@ -7,64 +7,9 @@
 
 use std::sync::RwLock;
 
-use super::{Design, DesignConfig, DesignParams, DesignType, Vertex};
-
-/// Rendering context for spectrogram calculations.
-struct SpectrogramContext {
-    width: f32,
-    height: f32,
-    beat_scale: f32,
-    local_expand: f32,
-}
-
-impl SpectrogramContext {
-    fn new(config: &DesignConfig) -> Self {
-        let glow_expand = if config.glow { 0.3 } else { 0.0 };
-        Self {
-            width: config.width as f32,
-            height: config.height as f32,
-            beat_scale: 1.0 + config.beat_intensity * 0.15,
-            local_expand: 1.0 + glow_expand,
-        }
-    }
-
-    #[inline]
-    fn to_ndc(&self, x: f32, y: f32) -> [f32; 2] {
-        [(x / self.width) * 2.0 - 1.0, 1.0 - (y / self.height) * 2.0]
-    }
-
-    /// Push a cell (small quad representing one time-frequency bin).
-    fn push_cell(
-        &self,
-        vertices: &mut Vec<Vertex>,
-        x_start: f32,
-        x_end: f32,
-        y_start: f32,
-        y_end: f32,
-        value: f32,
-        index: f32,
-    ) {
-        let positions = [
-            self.to_ndc(x_start, y_start), // top-left
-            self.to_ndc(x_end, y_start),   // top-right
-            self.to_ndc(x_start, y_end),   // bottom-left
-            self.to_ndc(x_end, y_end),     // bottom-right
-        ];
-
-        let local = self.local_expand;
-        let local_positions = [[-local, -local], [local, -local], [-local, local], [local, local]];
-        let indices = [0, 2, 1, 1, 2, 3];
-
-        for &idx in &indices {
-            vertices.push(Vertex {
-                position: positions[idx],
-                local_pos: local_positions[idx],
-                bar_height: value,
-                bar_index: index,
-            });
-        }
-    }
-}
+use super::{
+    Design, DesignConfig, DesignParams, DesignType, QuadData, Rect, RenderContext, Vertex,
+};
 
 /// Spectrogram-style frequency visualization with time history.
 ///
@@ -100,7 +45,12 @@ impl Design for SpectrogramDesign {
         DesignType::Spectrogram
     }
 
-    fn generate_vertices(&self, spectrum: &[f32], config: &DesignConfig, params: &DesignParams) -> Vec<Vertex> {
+    fn generate_vertices(
+        &self,
+        spectrum: &[f32],
+        config: &DesignConfig,
+        params: &DesignParams,
+    ) -> Vec<Vertex> {
         let params = match params {
             DesignParams::Spectrogram(p) => p,
             _ => return Vec::new(),
@@ -111,14 +61,15 @@ impl Design for SpectrogramDesign {
             return Vec::new();
         }
 
-        let ctx = SpectrogramContext::new(config);
+        let ctx = RenderContext::new(config);
 
         // Update history with new spectrum
         {
             let mut history = self.history.write().unwrap();
 
             // Add new spectrum frame (clamped to 0-1)
-            let new_frame: Vec<f32> = spectrum.iter()
+            let new_frame: Vec<f32> = spectrum
+                .iter()
                 .take(freq_bins)
                 .map(|&v| v.clamp(0.0, 1.0))
                 .collect();
@@ -174,14 +125,13 @@ impl Design for SpectrogramDesign {
                 let scaled_value = (value * ctx.beat_scale).clamp(0.0, 1.0);
 
                 // Use freq_idx as bar_index so the shader can color by frequency
-                ctx.push_cell(
+                ctx.push_quad(
                     &mut vertices,
-                    x_start,
-                    x_end,
-                    y_start,
-                    y_end,
-                    scaled_value,
-                    freq_idx as f32,
+                    QuadData {
+                        bounds: Rect::new(x_start, y_start, x_end, y_end),
+                        value: scaled_value,
+                        index: freq_idx as f32,
+                    },
                 );
             }
         }

@@ -1,6 +1,6 @@
 """Type stubs for phobz_visualizer Rust extension module."""
 
-from typing import Callable
+from collections.abc import Callable
 
 __version__: str
 

@@ -29,7 +29,15 @@ impl ParticleContext {
     }
 
     /// Push a particle quad.
-    fn push_particle(&self, vertices: &mut Vec<Vertex>, cx: f32, cy: f32, size: f32, value: f32, index: f32) {
+    fn push_particle(
+        &self,
+        vertices: &mut Vec<Vertex>,
+        cx: f32,
+        cy: f32,
+        size: f32,
+        value: f32,
+        index: f32,
+    ) {
         let half_size = size * 0.5;
 
         let positions = [
@@ -40,7 +48,12 @@ impl ParticleContext {
         ];
 
         let local = self.local_expand;
-        let local_positions = [[-local, -local], [local, -local], [-local, local], [local, local]];
+        let local_positions = [
+            [-local, -local],
+            [local, -local],
+            [-local, local],
+            [local, local],
+        ];
         let indices = [0, 2, 1, 1, 2, 3]; // Two triangles
 
         for &idx in &indices {
@@ -85,7 +98,12 @@ impl Design for ParticlesDesign {
         DesignType::Particles
     }
 
-    fn generate_vertices(&self, spectrum: &[f32], config: &DesignConfig, params: &DesignParams) -> Vec<Vertex> {
+    fn generate_vertices(
+        &self,
+        spectrum: &[f32],
+        config: &DesignConfig,
+        params: &DesignParams,
+    ) -> Vec<Vertex> {
         let params = match params {
             DesignParams::Particles(p) => p,
             _ => return Vec::new(),
@@ -101,7 +119,12 @@ impl Design for ParticlesDesign {
         let mut vertices = Vec::with_capacity(particle_count * 6);
 
         // Calculate average energy from spectrum
-        let energy: f32 = spectrum.iter().take(bar_count).map(|v| v.clamp(0.0, 1.0)).sum::<f32>() / bar_count as f32;
+        let energy: f32 = spectrum
+            .iter()
+            .take(bar_count)
+            .map(|v| v.clamp(0.0, 1.0))
+            .sum::<f32>()
+            / bar_count as f32;
         let energy_boost = 1.0 + energy * 0.5;
 
         // Create deterministic seed from spectrum
@@ -112,18 +135,30 @@ impl Design for ParticlesDesign {
 
         // Define spawn area based on pattern
         let (cx, cy, spread_x, spread_y) = match params.pattern {
-            ParticlePattern::Random => {
-                (ctx.width * 0.5, ctx.height * 0.5, ctx.width * 0.45, ctx.height * 0.45)
-            }
-            ParticlePattern::Center => {
-                (ctx.width * 0.5, ctx.height * 0.5, ctx.width * 0.25, ctx.height * 0.25)
-            }
-            ParticlePattern::Ring => {
-                (ctx.width * 0.5, ctx.height * 0.5, ctx.width * 0.35, ctx.height * 0.35)
-            }
-            ParticlePattern::Burst => {
-                (ctx.width * 0.5, ctx.height * 0.5, ctx.width * 0.4, ctx.height * 0.4)
-            }
+            ParticlePattern::Random => (
+                ctx.width * 0.5,
+                ctx.height * 0.5,
+                ctx.width * 0.45,
+                ctx.height * 0.45,
+            ),
+            ParticlePattern::Center => (
+                ctx.width * 0.5,
+                ctx.height * 0.5,
+                ctx.width * 0.25,
+                ctx.height * 0.25,
+            ),
+            ParticlePattern::Ring => (
+                ctx.width * 0.5,
+                ctx.height * 0.5,
+                ctx.width * 0.35,
+                ctx.height * 0.35,
+            ),
+            ParticlePattern::Burst => (
+                ctx.width * 0.5,
+                ctx.height * 0.5,
+                ctx.width * 0.4,
+                ctx.height * 0.4,
+            ),
         };
 
         for i in 0..particle_count {
@@ -152,7 +187,10 @@ impl Design for ParticlesDesign {
                     let angle = (i as f32 / particle_count as f32) * std::f32::consts::TAU;
                     let base_dist = spread_x * 0.8;
                     let dist = base_dist + rng.next_range(-20.0, 20.0) * value;
-                    (cx + angle.cos() * dist * energy_boost, cy + angle.sin() * dist * energy_boost)
+                    (
+                        cx + angle.cos() * dist * energy_boost,
+                        cy + angle.sin() * dist * energy_boost,
+                    )
                 }
                 ParticlePattern::Burst => {
                     let angle = rng.next() * std::f32::consts::TAU;

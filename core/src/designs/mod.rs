@@ -59,6 +59,106 @@ pub struct Vertex {
     pub bar_index: f32,
 }
 
+/// Axis-aligned bounding rectangle in pixel coordinates.
+#[derive(Copy, Clone, Debug, Default)]
+pub struct Rect {
+    pub x1: f32,
+    pub y1: f32,
+    pub x2: f32,
+    pub y2: f32,
+}
+
+impl Rect {
+    /// Create a new rectangle from corner coordinates.
+    #[inline]
+    pub fn new(x1: f32, y1: f32, x2: f32, y2: f32) -> Self {
+        Self { x1, y1, x2, y2 }
+    }
+
+    /// Ensure coordinates are properly ordered (min to max).
+    #[inline]
+    pub fn normalized(self) -> Self {
+        let (x1, x2) = if self.x1 < self.x2 {
+            (self.x1, self.x2)
+        } else {
+            (self.x2, self.x1)
+        };
+        let (y1, y2) = if self.y1 < self.y2 {
+            (self.y1, self.y2)
+        } else {
+            (self.y2, self.y1)
+        };
+        Self { x1, y1, x2, y2 }
+    }
+}
+
+/// Data for a single quad (bar/cell) to be rendered.
+#[derive(Copy, Clone, Debug, Default)]
+pub struct QuadData {
+    pub bounds: Rect,
+    pub value: f32,
+    pub index: f32,
+}
+
+/// Shared rendering context for all designs.
+///
+/// Provides common utilities for coordinate conversion and vertex generation.
+#[derive(Copy, Clone, Debug)]
+pub struct RenderContext {
+    pub width: f32,
+    pub height: f32,
+    pub beat_scale: f32,
+    pub local_expand: f32,
+}
+
+impl RenderContext {
+    /// Create a new render context from design config.
+    pub fn new(config: &DesignConfig) -> Self {
+        let glow_expand = if config.glow { 0.3 } else { 0.0 };
+        Self {
+            width: config.width as f32,
+            height: config.height as f32,
+            beat_scale: 1.0 + config.beat_intensity * 0.15,
+            local_expand: 1.0 + glow_expand,
+        }
+    }
+
+    /// Convert pixel coordinates to normalized device coordinates.
+    #[inline]
+    pub fn to_ndc(&self, x: f32, y: f32) -> [f32; 2] {
+        [(x / self.width) * 2.0 - 1.0, 1.0 - (y / self.height) * 2.0]
+    }
+
+    /// Push a quad to the vertex buffer.
+    pub fn push_quad(&self, vertices: &mut Vec<Vertex>, quad: QuadData) {
+        let bounds = quad.bounds.normalized();
+        let positions = [
+            self.to_ndc(bounds.x1, bounds.y1),
+            self.to_ndc(bounds.x2, bounds.y1),
+            self.to_ndc(bounds.x1, bounds.y2),
+            self.to_ndc(bounds.x2, bounds.y2),
+        ];
+
+        let local = self.local_expand;
+        let local_positions = [
+            [-local, -local],
+            [local, -local],
+            [-local, local],
+            [local, local],
+        ];
+
+        const INDICES: [usize; 6] = [0, 2, 1, 1, 2, 3];
+        for &idx in &INDICES {
+            vertices.push(Vertex {
+                position: positions[idx],
+                local_pos: local_positions[idx],
+                bar_height: quad.value,
+                bar_index: quad.index,
+            });
+        }
+    }
+}
+
 /// Common configuration for all designs.
 #[derive(Debug, Clone)]
 pub struct DesignConfig {
@@ -111,10 +211,14 @@ impl DesignType {
             "bars" => Some(Self::Bars),
             "circular-radial" | "circularradial" | "radial" => Some(Self::CircularRadial),
             "circular-ring" | "circularring" | "ring" => Some(Self::CircularRing),
-            "frame-perimeter" | "frameperimeter" | "perimeter" | "frame" => Some(Self::FramePerimeter),
+            "frame-perimeter" | "frameperimeter" | "perimeter" | "frame" => {
+                Some(Self::FramePerimeter)
+            }
             "frame-corners" | "framecorners" | "corners" => Some(Self::FrameCorners),
             "waveform-line" | "waveformline" | "line" | "oscilloscope" => Some(Self::WaveformLine),
-            "spectrum-mountain" | "spectrummountain" | "mountain" | "area" => Some(Self::SpectrumMountain),
+            "spectrum-mountain" | "spectrummountain" | "mountain" | "area" => {
+                Some(Self::SpectrumMountain)
+            }
             "particles" | "particle" => Some(Self::Particles),
             "spectrogram" | "spectro" | "frequency" => Some(Self::Spectrogram),
             _ => None,
@@ -221,7 +325,10 @@ mod tests {
     fn test_design_type_from_str_parsing() {
         assert_eq!(DesignType::from_str("bars"), Some(DesignType::Bars));
         assert_eq!(DesignType::from_str("BARS"), Some(DesignType::Bars));
-        assert_eq!(DesignType::from_str("radial"), Some(DesignType::CircularRadial));
+        assert_eq!(
+            DesignType::from_str("radial"),
+            Some(DesignType::CircularRadial)
+        );
         assert_eq!(DesignType::from_str("ring"), Some(DesignType::CircularRing));
         assert_eq!(DesignType::from_str("invalid"), None);
     }
@@ -287,7 +394,11 @@ mod tests {
             let design = create_design(*design_type);
             let params = default_params(*design_type);
             let vertices = design.generate_vertices(&spectrum, &config, &params);
-            assert!(vertices.is_empty(), "{:?} should produce no vertices for empty spectrum", design_type);
+            assert!(
+                vertices.is_empty(),
+                "{:?} should produce no vertices for empty spectrum",
+                design_type
+            );
         }
     }
 }

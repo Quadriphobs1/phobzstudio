@@ -11,10 +11,21 @@ pub struct RenderTarget {
 
 impl RenderTarget {
     /// Create a new render target with the specified usage flags.
-    pub fn new(device: &Device, label: &str, width: u32, height: u32, format: TextureFormat, usage: TextureUsages) -> Self {
+    pub fn new(
+        device: &Device,
+        label: &str,
+        width: u32,
+        height: u32,
+        format: TextureFormat,
+        usage: TextureUsages,
+    ) -> Self {
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some(label),
-            size: wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+            size: wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
@@ -27,13 +38,39 @@ impl RenderTarget {
     }
 
     /// Create a render target for scene rendering (can be sampled for post-processing).
-    pub fn for_scene(device: &Device, label: &str, width: u32, height: u32, format: TextureFormat) -> Self {
-        Self::new(device, label, width, height, format, TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING)
+    pub fn for_scene(
+        device: &Device,
+        label: &str,
+        width: u32,
+        height: u32,
+        format: TextureFormat,
+    ) -> Self {
+        Self::new(
+            device,
+            label,
+            width,
+            height,
+            format,
+            TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
+        )
     }
 
     /// Create a render target for final output (can be copied to CPU).
-    pub fn for_output(device: &Device, label: &str, width: u32, height: u32, format: TextureFormat) -> Self {
-        Self::new(device, label, width, height, format, TextureUsages::RENDER_ATTACHMENT | TextureUsages::COPY_SRC)
+    pub fn for_output(
+        device: &Device,
+        label: &str,
+        width: u32,
+        height: u32,
+        format: TextureFormat,
+    ) -> Self {
+        Self::new(
+            device,
+            label,
+            width,
+            height,
+            format,
+            TextureUsages::RENDER_ATTACHMENT | TextureUsages::COPY_SRC,
+        )
     }
 
     /// Get the texture view for rendering or sampling.
@@ -71,7 +108,13 @@ impl ReadbackBuffer {
             mapped_at_creation: false,
         });
 
-        Self { buffer, width, height, padded_row_bytes, unpadded_row_bytes }
+        Self {
+            buffer,
+            width,
+            height,
+            padded_row_bytes,
+            unpadded_row_bytes,
+        }
     }
 
     /// Get the underlying buffer.
@@ -117,7 +160,8 @@ mod tests {
             Err(_) => return,
         };
 
-        let _target = RenderTarget::for_scene(&ctx.device, "test", 256, 256, TextureFormat::Rgba8Unorm);
+        let _target =
+            RenderTarget::for_scene(&ctx.device, "test", 256, 256, TextureFormat::Rgba8Unorm);
         // Test passes if creation succeeds without panic
     }
 

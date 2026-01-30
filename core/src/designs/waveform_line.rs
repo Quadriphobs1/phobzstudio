@@ -56,7 +56,12 @@ impl LineContext {
         ];
 
         let local = self.local_expand;
-        let local_positions = [[-local, -local], [-local, local], [local, -local], [local, local]];
+        let local_positions = [
+            [-local, -local],
+            [-local, local],
+            [local, -local],
+            [local, local],
+        ];
         let indices = [0, 1, 2, 2, 1, 3]; // Two triangles
 
         for &idx in &indices {
@@ -78,7 +83,12 @@ impl Design for WaveformLineDesign {
         DesignType::WaveformLine
     }
 
-    fn generate_vertices(&self, spectrum: &[f32], config: &DesignConfig, params: &DesignParams) -> Vec<Vertex> {
+    fn generate_vertices(
+        &self,
+        spectrum: &[f32],
+        config: &DesignConfig,
+        params: &DesignParams,
+    ) -> Vec<Vertex> {
         let params = match params {
             DesignParams::WaveformLine(p) => p,
             _ => return Vec::new(),
@@ -129,7 +139,16 @@ impl Design for WaveformLineDesign {
             };
 
             let avg_value = (v1 + v2) * 0.5;
-            ctx.push_line_segment(&mut vertices, x1, y1, x2, y2, half_width, avg_value, i as f32);
+            ctx.push_line_segment(
+                &mut vertices,
+                x1,
+                y1,
+                x2,
+                y2,
+                half_width,
+                avg_value,
+                i as f32,
+            );
         }
 
         vertices

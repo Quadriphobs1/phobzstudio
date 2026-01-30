@@ -2,12 +2,12 @@
 //!
 //! Provides a centralized way to create design instances and get their default parameters.
 
+use super::params::*;
 use super::{
     BarsDesign, CircularRadialDesign, CircularRingDesign, Design, DesignParams, DesignType,
     FrameCornersDesign, FramePerimeterDesign, ParticlesDesign, SpectrogramDesign,
     SpectrumMountainDesign, WaveformLineDesign,
 };
-use super::params::*;
 
 /// Create a design instance from type.
 ///
@@ -49,7 +49,9 @@ pub fn default_params(design_type: DesignType) -> DesignParams {
         DesignType::FramePerimeter => DesignParams::FramePerimeter(FramePerimeterParams::default()),
         DesignType::FrameCorners => DesignParams::FrameCorners(FrameCornersParams::default()),
         DesignType::WaveformLine => DesignParams::WaveformLine(WaveformLineParams::default()),
-        DesignType::SpectrumMountain => DesignParams::SpectrumMountain(SpectrumMountainParams::default()),
+        DesignType::SpectrumMountain => {
+            DesignParams::SpectrumMountain(SpectrumMountainParams::default())
+        }
         DesignType::Particles => DesignParams::Particles(ParticlesParams::default()),
         DesignType::Spectrogram => DesignParams::Spectrogram(SpectrogramParams::default()),
     }

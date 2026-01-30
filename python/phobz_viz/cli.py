@@ -3,12 +3,13 @@
 Command-line interface for generating audio visualizations.
 """
 
-from pathlib import Path
 import json
+from pathlib import Path
+from typing import Annotated
 
 import typer
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
+from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
 from .platforms import Platform
@@ -29,29 +30,37 @@ def _get_core():
         return phobz_visualizer
     except ImportError:
         console.print("[red]Error: Rust core not built. Run 'just build' first.[/red]")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
+
+
+DESIGN_HELP = (
+    "Visualization design (bars, circular-radial, circular-ring, frame-perimeter, "
+    "frame-corners, waveform-line, spectrum-mountain, particles, spectrogram)"
+)
 
 
 @app.command()
 def render(
-    audio: Path = typer.Argument(..., help="Path to audio file (WAV, MP3, FLAC)"),
-    output: Path = typer.Option(Path("output.mp4"), "-o", "--output", help="Output video path"),
-    platform: str = typer.Option(
-        "youtube", "-p", "--platform", help="Platform preset (youtube, shorts, tiktok, instagram)"
+    audio: Annotated[Path, typer.Argument(help="Path to audio file (WAV, MP3, FLAC)")],
+    output: Annotated[Path, typer.Option("-o", "--output", help="Output video path")] = Path(
+        "output.mp4"
     ),
-    format: str = typer.Option(
-        "h264", "-f", "--format", help="Output format (h264, prores4444, vp9)"
-    ),
-    transparent: bool = typer.Option(
-        False, "--transparent", help="Render with alpha channel (no background)"
-    ),
-    color: str = typer.Option("#00ff88", "--color", help="Waveform color (hex)"),
-    bars: int = typer.Option(64, "--bars", help="Number of waveform bars"),
-    mirror: bool = typer.Option(False, "--mirror", help="Mirror waveform (symmetrical display)"),
-    glow: bool = typer.Option(True, "--glow/--no-glow", help="Enable glow effect"),
-    design: str = typer.Option(
-        "bars", "-d", "--design", help="Visualization design (bars, circular-radial, circular-ring, frame-perimeter, frame-corners, waveform-line, spectrum-mountain, particles, spectrogram)"
-    ),
+    platform: Annotated[
+        str, typer.Option("-p", "--platform", help="Platform preset (youtube, shorts, tiktok)")
+    ] = "youtube",
+    format: Annotated[
+        str, typer.Option("-f", "--format", help="Output format (h264, prores4444, vp9)")
+    ] = "h264",
+    transparent: Annotated[
+        bool, typer.Option("--transparent", help="Render with alpha channel (no background)")
+    ] = False,
+    color: Annotated[str, typer.Option("--color", help="Waveform color (hex)")] = "#00ff88",
+    bars: Annotated[int, typer.Option("--bars", help="Number of waveform bars")] = 64,
+    mirror: Annotated[
+        bool, typer.Option("--mirror", help="Mirror waveform (symmetrical display)")
+    ] = False,
+    glow: Annotated[bool, typer.Option("--glow/--no-glow", help="Enable glow effect")] = True,
+    design: Annotated[str, typer.Option("-d", "--design", help=DESIGN_HELP)] = "bars",
 ) -> None:
     """Generate visualization video from audio file."""
     core = _get_core()
@@ -66,11 +75,12 @@ def render(
         preset = Platform.from_name(platform)
     except ValueError:
         console.print(
-            f"[red]Error: Unknown platform '{platform}'. Use 'phobz-viz platforms' to list available presets.[/red]"
+            f"[red]Error: Unknown platform '{platform}'. "
+            "Use 'phobz-viz platforms' to list available presets.[/red]"
         )
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
-    console.print(f"[bold green]Phobz Visualizer[/bold green]")
+    console.print("[bold green]Phobz Visualizer[/bold green]")
     console.print(f"Audio: {audio}")
     console.print(f"Output: {output}")
     console.print(f"Platform: {platform} ({preset.width}x{preset.height})")
@@ -115,15 +125,17 @@ def render(
             )
         except Exception as e:
             console.print(f"[red]Error: {e}[/red]")
-            raise typer.Exit(1)
+            raise typer.Exit(1) from None
 
     console.print(f"[bold green]Done![/bold green] Output: {output}")
 
 
 @app.command()
 def analyze(
-    audio: Path = typer.Argument(..., help="Path to audio file"),
-    output: Path = typer.Option(Path("analysis.json"), "-o", "--output", help="Output JSON path"),
+    audio: Annotated[Path, typer.Argument(help="Path to audio file")],
+    output: Annotated[Path, typer.Option("-o", "--output", help="Output JSON path")] = Path(
+        "analysis.json"
+    ),
 ) -> None:
     """Analyze audio and export data as JSON."""
     core = _get_core()
@@ -139,7 +151,7 @@ def analyze(
         output.write_text(analysis_json)
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
     # Parse and display summary
     analysis = json.loads(analysis_json)

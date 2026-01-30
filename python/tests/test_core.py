@@ -1,9 +1,5 @@
 """Tests for the phobz-viz core functionality."""
 
-import json
-import tempfile
-from pathlib import Path
-
 import pytest
 
 
@@ -38,16 +34,16 @@ def test_parse_color(core):
 
 def test_parse_color_invalid(core):
     """Test invalid color parsing."""
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         core.parse_color("invalid")
 
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         core.parse_color("#fff")  # Too short
 
 
 def test_platforms():
     """Test platform presets."""
-    from phobz_viz.platforms import Platform, YOUTUBE, TIKTOK, SHORTS
+    from phobz_viz.platforms import SHORTS, TIKTOK, YOUTUBE, Platform
 
     # Test preset values
     assert YOUTUBE.width == 1920
@@ -81,6 +77,7 @@ def test_platforms():
 def test_cli_platforms():
     """Test CLI platforms command."""
     from typer.testing import CliRunner
+
     from phobz_viz.cli import app
 
     runner = CliRunner()
@@ -94,6 +91,7 @@ def test_cli_platforms():
 def test_cli_version():
     """Test CLI version command."""
     from typer.testing import CliRunner
+
     from phobz_viz.cli import app
 
     runner = CliRunner()

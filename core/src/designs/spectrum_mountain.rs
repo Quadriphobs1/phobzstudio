@@ -42,10 +42,10 @@ impl MountainContext {
         index: f32,
     ) {
         let positions = [
-            self.to_ndc(x1, y_top1),    // top-left
-            self.to_ndc(x2, y_top2),    // top-right
-            self.to_ndc(x1, y_bottom),  // bottom-left
-            self.to_ndc(x2, y_bottom),  // bottom-right
+            self.to_ndc(x1, y_top1),   // top-left
+            self.to_ndc(x2, y_top2),   // top-right
+            self.to_ndc(x1, y_bottom), // bottom-left
+            self.to_ndc(x2, y_bottom), // bottom-right
         ];
 
         let local = self.local_expand;
@@ -77,7 +77,12 @@ impl Design for SpectrumMountainDesign {
         DesignType::SpectrumMountain
     }
 
-    fn generate_vertices(&self, spectrum: &[f32], config: &DesignConfig, params: &DesignParams) -> Vec<Vertex> {
+    fn generate_vertices(
+        &self,
+        spectrum: &[f32],
+        config: &DesignConfig,
+        params: &DesignParams,
+    ) -> Vec<Vertex> {
         let params = match params {
             DesignParams::SpectrumMountain(p) => p,
             _ => return Vec::new(),
@@ -121,8 +126,10 @@ impl Design for SpectrumMountainDesign {
                 // Top half (above baseline going up)
                 ctx.push_slice(
                     &mut vertices,
-                    x1, x2,
-                    y_top1, y_top2,
+                    x1,
+                    x2,
+                    y_top1,
+                    y_top2,
                     baseline,
                     (v1 + v2) * 0.5,
                     i as f32,
@@ -132,8 +139,10 @@ impl Design for SpectrumMountainDesign {
                 let y_bottom2 = baseline + v2 * max_height * ctx.beat_scale;
                 ctx.push_slice(
                     &mut vertices,
-                    x1, x2,
-                    baseline, baseline,
+                    x1,
+                    x2,
+                    baseline,
+                    baseline,
                     y_bottom1.max(y_bottom2),
                     (v1 + v2) * 0.5,
                     i as f32,
@@ -141,8 +150,10 @@ impl Design for SpectrumMountainDesign {
             } else {
                 ctx.push_slice(
                     &mut vertices,
-                    x1, x2,
-                    y_top1, y_top2,
+                    x1,
+                    x2,
+                    y_top1,
+                    y_top2,
                     baseline,
                     (v1 + v2) * 0.5,
                     i as f32,
