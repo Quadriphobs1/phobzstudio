@@ -49,6 +49,9 @@ def render(
     bars: int = typer.Option(64, "--bars", help="Number of waveform bars"),
     mirror: bool = typer.Option(False, "--mirror", help="Mirror waveform (symmetrical display)"),
     glow: bool = typer.Option(True, "--glow/--no-glow", help="Enable glow effect"),
+    design: str = typer.Option(
+        "bars", "-d", "--design", help="Visualization design (bars, circular-radial, circular-ring)"
+    ),
 ) -> None:
     """Generate visualization video from audio file."""
     core = _get_core()
@@ -76,6 +79,7 @@ def render(
     console.print(f"Bars: {bars}")
     console.print(f"Mirror: {mirror}")
     console.print(f"Glow: {glow}")
+    console.print(f"Design: {design}")
     console.print()
 
     # Background color
@@ -106,6 +110,7 @@ def render(
                 codec=format,
                 mirror=mirror,
                 glow=glow,
+                design=design,
                 progress_callback=update_progress,
             )
         except Exception as e:
@@ -165,6 +170,22 @@ def platforms() -> None:
         )
 
     console.print(table)
+
+
+@app.command()
+def designs() -> None:
+    """List available visualization designs."""
+    core = _get_core()
+
+    table = Table(title="Visualization Designs")
+    table.add_column("Name", style="cyan")
+    table.add_column("Description", style="green")
+
+    for name, description in core.list_designs():
+        table.add_row(name, description)
+
+    console.print(table)
+    console.print("\n[dim]Use --design <name> with the render command.[/dim]")
 
 
 @app.command()

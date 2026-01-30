@@ -12,13 +12,18 @@
 //! - Python bindings via PyO3 (when `python` feature is enabled)
 
 pub mod audio;
+pub mod designs;
 pub mod gpu;
 pub mod pipeline;
 pub mod video;
 
 // Re-export commonly used types
 pub use audio::{analyze_audio, load_audio, AudioAnalysis, AudioData, SpectrumAnalyzer};
-pub use gpu::{GpuContext, RenderConfig, WaveformRenderer};
+pub use designs::{
+    create_design, default_params, BarsParams, CircularRadialParams, CircularRingParams, Design,
+    DesignConfig, DesignParams, DesignType, Vertex,
+};
+pub use gpu::{DesignRenderConfig, DesignRenderer, GpuContext, RenderConfig, WaveformRenderer};
 pub use pipeline::{
     analyze_audio_file, parse_hex_color, render_video, PipelineConfig, PipelineError,
 };
@@ -46,7 +51,7 @@ mod python_bindings {
 
     /// Render visualization video from audio file.
     #[pyfunction]
-    #[pyo3(signature = (audio_path, output_path, width=1920, height=1080, fps=30, bar_count=64, color="#00ff88", background="#000000", codec="h264", bitrate=8000000, mirror=false, glow=true, progress_callback=None))]
+    #[pyo3(signature = (audio_path, output_path, width=1920, height=1080, fps=30, bar_count=64, color="#00ff88", background="#000000", codec="h264", bitrate=8000000, mirror=false, glow=true, design="bars", progress_callback=None))]
     fn render_video(
         py: Python<'_>,
         audio_path: &str,
@@ -61,6 +66,7 @@ mod python_bindings {
         bitrate: u64,
         mirror: bool,
         glow: bool,
+        design: &str,
         progress_callback: Option<Py<PyAny>>,
     ) -> PyResult<()> {
         let color_rgb = pipeline::parse_hex_color(color)
@@ -76,6 +82,13 @@ mod python_bindings {
             _ => return Err(PyRuntimeError::new_err(format!("Unknown codec: {}", codec))),
         };
 
+        let design_type = crate::designs::DesignType::from_str(design).ok_or_else(|| {
+            PyRuntimeError::new_err(format!(
+                "Unknown design: {}. Available: bars, circular-radial, circular-ring",
+                design
+            ))
+        })?;
+
         let config = PipelineConfig {
             width,
             height,
@@ -88,6 +101,7 @@ mod python_bindings {
             fft_size: 2048,
             mirror,
             glow,
+            design_type,
         };
 
         // Create callback wrapper
@@ -212,6 +226,15 @@ mod python_bindings {
         Ok(())
     }
 
+    /// List all available design types.
+    #[pyfunction]
+    fn list_designs() -> Vec<(String, String)> {
+        crate::designs::DesignType::all()
+            .iter()
+            .map(|d| (d.name().to_string(), d.description().to_string()))
+            .collect()
+    }
+
     /// Phobz Visualizer Python module
     #[pymodule]
     pub fn phobz_visualizer(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -222,6 +245,7 @@ mod python_bindings {
         m.add_function(wrap_pyfunction!(generate_test_beat, m)?)?;
         m.add_function(wrap_pyfunction!(generate_sine, m)?)?;
         m.add_function(wrap_pyfunction!(generate_click_track, m)?)?;
+        m.add_function(wrap_pyfunction!(list_designs, m)?)?;
         Ok(())
     }
 }

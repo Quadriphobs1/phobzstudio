@@ -1,7 +1,8 @@
 //! Full render pipeline combining audio, GPU, and video.
 
 use crate::audio::{load_audio, AudioAnalysis, AudioError, SpectrumAnalyzer};
-use crate::gpu::{GpuError, RenderConfig, WaveformRenderer};
+use crate::designs::{default_params, BarsParams, DesignParams, DesignType};
+use crate::gpu::{DesignRenderConfig, DesignRenderer, GpuError, RenderConfig};
 use crate::video::{VideoCodec, VideoConfig, VideoEncoder, VideoError};
 use std::path::Path;
 
@@ -19,6 +20,7 @@ pub struct PipelineConfig {
     pub codec: VideoCodec,
     pub mirror: bool,
     pub glow: bool,
+    pub design_type: DesignType,
 }
 
 impl Default for PipelineConfig {
@@ -35,6 +37,7 @@ impl Default for PipelineConfig {
             codec: VideoCodec::H264,
             mirror: false,
             glow: true,
+            design_type: DesignType::Bars,
         }
     }
 }
@@ -50,6 +53,29 @@ impl PipelineConfig {
             vertical: self.height > self.width,
             mirror: self.mirror,
             glow: self.glow,
+        }
+    }
+
+    /// Convert to DesignRenderConfig for design-based rendering.
+    pub fn to_design_render_config(&self) -> DesignRenderConfig {
+        let design_params = match self.design_type {
+            DesignType::Bars => DesignParams::Bars(BarsParams {
+                mirror: self.mirror,
+                gap_ratio: 0.1,
+                vertical: self.height > self.width,
+            }),
+            _ => default_params(self.design_type),
+        };
+
+        DesignRenderConfig {
+            width: self.width,
+            height: self.height,
+            color: self.color,
+            background: self.background,
+            bar_count: self.bar_count,
+            glow: self.glow,
+            design_type: self.design_type,
+            design_params,
         }
     }
 
@@ -125,8 +151,8 @@ pub async fn render_video<P: AsRef<Path>, Q: AsRef<Path>>(
     // Create spectrum analyzer
     let mut analyzer = SpectrumAnalyzer::new(config.fft_size);
 
-    // Create GPU renderer using config conversion
-    let renderer = WaveformRenderer::new(config.to_render_config()).await?;
+    // Create GPU renderer using design system
+    let renderer = DesignRenderer::new(config.to_design_render_config()).await?;
 
     // Create video encoder using config conversion
     let mut encoder = VideoEncoder::new(output_path.as_ref(), config.to_video_config())?;
