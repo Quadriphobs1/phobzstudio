@@ -59,6 +59,7 @@ impl Design for BarsDesign {
 }
 
 impl BarsDesign {
+    #[allow(clippy::too_many_arguments)]
     fn generate_horizontal_bars(
         &self,
         spectrum: &[f32],
@@ -107,6 +108,7 @@ impl BarsDesign {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn generate_vertical_bars(
         &self,
         spectrum: &[f32],
@@ -155,6 +157,7 @@ impl BarsDesign {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn push_quad(
         &self,
         vertices: &mut Vec<Vertex>,

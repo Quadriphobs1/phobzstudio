@@ -8,9 +8,11 @@
 
 mod bars;
 mod circular;
+mod frame_perimeter;
 
 pub use bars::BarsDesign;
 pub use circular::{CircularRadialDesign, CircularRingDesign};
+pub use frame_perimeter::FramePerimeterDesign;
 
 use std::f32::consts::PI;
 
@@ -56,14 +58,17 @@ pub enum DesignType {
     Bars,
     CircularRadial,
     CircularRing,
+    FramePerimeter,
 }
 
 impl DesignType {
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "bars" => Some(Self::Bars),
             "circular-radial" | "circularradial" | "radial" => Some(Self::CircularRadial),
             "circular-ring" | "circularring" | "ring" => Some(Self::CircularRing),
+            "frame-perimeter" | "frameperimeter" | "perimeter" | "frame" => Some(Self::FramePerimeter),
             _ => None,
         }
     }
@@ -73,6 +78,7 @@ impl DesignType {
             Self::Bars => "bars",
             Self::CircularRadial => "circular-radial",
             Self::CircularRing => "circular-ring",
+            Self::FramePerimeter => "frame-perimeter",
         }
     }
 
@@ -81,11 +87,12 @@ impl DesignType {
             Self::Bars => "Traditional vertical/horizontal bars",
             Self::CircularRadial => "Bars emanating outward from center",
             Self::CircularRing => "Bars arranged around a ring",
+            Self::FramePerimeter => "Bars along screen edges (overlay)",
         }
     }
 
     pub fn all() -> &'static [Self] {
-        &[Self::Bars, Self::CircularRadial, Self::CircularRing]
+        &[Self::Bars, Self::CircularRadial, Self::CircularRing, Self::FramePerimeter]
     }
 }
 
@@ -95,6 +102,7 @@ pub enum DesignParams {
     Bars(BarsParams),
     CircularRadial(CircularRadialParams),
     CircularRing(CircularRingParams),
+    FramePerimeter(FramePerimeterParams),
 }
 
 impl Default for DesignParams {
@@ -163,6 +171,45 @@ impl Default for CircularRingParams {
     }
 }
 
+/// Parameters for frame perimeter design.
+#[derive(Debug, Clone)]
+pub struct FramePerimeterParams {
+    /// Distance from screen edge in pixels.
+    pub inset: f32,
+    /// Thickness of each bar in pixels.
+    pub bar_thickness: f32,
+    /// Whether bars point inward (true) or outward (false).
+    pub inward: bool,
+    /// Distribution of bars across edges.
+    pub distribution: EdgeDistribution,
+}
+
+impl Default for FramePerimeterParams {
+    fn default() -> Self {
+        Self {
+            inset: 20.0,
+            bar_thickness: 8.0,
+            inward: true,
+            distribution: EdgeDistribution::All,
+        }
+    }
+}
+
+/// How bars are distributed across frame edges.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EdgeDistribution {
+    /// Distribute bars proportionally across all edges.
+    All,
+    /// Bars only on top and bottom edges.
+    TopBottom,
+    /// Bars only on left and right edges.
+    LeftRight,
+    /// Bars only on top edge.
+    TopOnly,
+    /// Bars only on bottom edge.
+    BottomOnly,
+}
+
 /// Trait for visualization designs.
 pub trait Design: Send + Sync {
     /// Generate vertices for the current frame.
@@ -183,6 +230,7 @@ pub fn create_design(design_type: DesignType) -> Box<dyn Design> {
         DesignType::Bars => Box::new(BarsDesign),
         DesignType::CircularRadial => Box::new(CircularRadialDesign),
         DesignType::CircularRing => Box::new(CircularRingDesign),
+        DesignType::FramePerimeter => Box::new(FramePerimeterDesign),
     }
 }
 
@@ -192,6 +240,7 @@ pub fn default_params(design_type: DesignType) -> DesignParams {
         DesignType::Bars => DesignParams::Bars(BarsParams::default()),
         DesignType::CircularRadial => DesignParams::CircularRadial(CircularRadialParams::default()),
         DesignType::CircularRing => DesignParams::CircularRing(CircularRingParams::default()),
+        DesignType::FramePerimeter => DesignParams::FramePerimeter(FramePerimeterParams::default()),
     }
 }
 

@@ -3,7 +3,7 @@
 use phobz_visualizer::designs::{
     create_design, default_params, BarsDesign, BarsParams, CircularRadialDesign,
     CircularRadialParams, CircularRingDesign, CircularRingParams, Design, DesignConfig,
-    DesignParams, DesignType,
+    DesignParams, DesignType, EdgeDistribution, FramePerimeterDesign, FramePerimeterParams,
 };
 use std::f32::consts::PI;
 
@@ -26,6 +26,7 @@ fn test_all_design_types_have_default_params() {
             (DesignType::Bars, DesignParams::Bars(_)) => {}
             (DesignType::CircularRadial, DesignParams::CircularRadial(_)) => {}
             (DesignType::CircularRing, DesignParams::CircularRing(_)) => {}
+            (DesignType::FramePerimeter, DesignParams::FramePerimeter(_)) => {}
             _ => panic!("Params don't match design type"),
         }
     }
@@ -362,6 +363,130 @@ fn test_circular_ring_rotation() {
         (first_bar_no_rot.position[0] - first_bar_quarter_rot.position[0]).abs() > 0.1
             || (first_bar_no_rot.position[1] - first_bar_quarter_rot.position[1]).abs() > 0.1,
         "Rotation should change vertex positions"
+    );
+}
+
+// ==================== Frame Perimeter Integration Tests ====================
+
+#[test]
+fn test_frame_perimeter_distributes_bars_across_all_edges() {
+    let design = FramePerimeterDesign;
+    let config = DesignConfig {
+        width: 640,
+        height: 480,
+        bar_count: 32,
+        ..Default::default()
+    };
+    let params = DesignParams::FramePerimeter(FramePerimeterParams {
+        distribution: EdgeDistribution::All,
+        ..Default::default()
+    });
+    let spectrum: Vec<f32> = vec![0.5; 32];
+
+    let vertices = design.generate_vertices(&spectrum, &config, &params);
+
+    // Should have vertices spread across all quadrants (edges)
+    let mut has_left = false;
+    let mut has_right = false;
+    let mut has_top = false;
+    let mut has_bottom = false;
+
+    for v in &vertices {
+        if v.position[0] < -0.5 {
+            has_left = true;
+        }
+        if v.position[0] > 0.5 {
+            has_right = true;
+        }
+        if v.position[1] > 0.5 {
+            has_top = true;
+        }
+        if v.position[1] < -0.5 {
+            has_bottom = true;
+        }
+    }
+
+    assert!(has_left, "All distribution should have bars on left edge");
+    assert!(has_right, "All distribution should have bars on right edge");
+    assert!(has_top, "All distribution should have bars on top edge");
+    assert!(has_bottom, "All distribution should have bars on bottom edge");
+}
+
+#[test]
+fn test_frame_perimeter_top_bottom_distribution() {
+    let design = FramePerimeterDesign;
+    let config = DesignConfig {
+        width: 640,
+        height: 480,
+        bar_count: 16,
+        glow: false, // Disable glow to get exact positions
+        ..Default::default()
+    };
+    let params = DesignParams::FramePerimeter(FramePerimeterParams {
+        distribution: EdgeDistribution::TopBottom,
+        ..Default::default()
+    });
+    let spectrum: Vec<f32> = vec![0.5; 16];
+
+    let vertices = design.generate_vertices(&spectrum, &config, &params);
+
+    // TopBottom bars should be at top/bottom edges (high/low Y values)
+    // Verify bars are near top or bottom of screen
+    let mut has_top = false;
+    let mut has_bottom = false;
+    for v in &vertices {
+        if v.position[1] > 0.5 {
+            has_top = true;
+        }
+        if v.position[1] < -0.5 {
+            has_bottom = true;
+        }
+    }
+    assert!(has_top, "TopBottom should have bars near top edge");
+    assert!(has_bottom, "TopBottom should have bars near bottom edge");
+}
+
+#[test]
+fn test_frame_perimeter_inward_vs_outward() {
+    let design = FramePerimeterDesign;
+    let config = DesignConfig {
+        width: 640,
+        height: 480,
+        bar_count: 8,
+        glow: false,
+        ..Default::default()
+    };
+
+    let params_inward = DesignParams::FramePerimeter(FramePerimeterParams {
+        distribution: EdgeDistribution::TopOnly,
+        inward: true,
+        ..Default::default()
+    });
+
+    let params_outward = DesignParams::FramePerimeter(FramePerimeterParams {
+        distribution: EdgeDistribution::TopOnly,
+        inward: false,
+        ..Default::default()
+    });
+
+    let spectrum: Vec<f32> = vec![1.0; 8];
+
+    let vertices_inward = design.generate_vertices(&spectrum, &config, &params_inward);
+    let vertices_outward = design.generate_vertices(&spectrum, &config, &params_outward);
+
+    // Inward bars should extend toward center (lower Y values in NDC)
+    // Outward bars should extend away from center (toward edge)
+    let avg_y_inward: f32 = vertices_inward.iter().map(|v| v.position[1]).sum::<f32>()
+        / vertices_inward.len() as f32;
+    let avg_y_outward: f32 = vertices_outward.iter().map(|v| v.position[1]).sum::<f32>()
+        / vertices_outward.len() as f32;
+
+    // Inward from top edge means bars extend downward (lower Y in NDC = toward center)
+    assert!(
+        avg_y_inward < avg_y_outward,
+        "Inward bars should have lower average Y (toward center): {} vs {}",
+        avg_y_inward,
+        avg_y_outward
     );
 }
 

@@ -84,7 +84,7 @@ mod python_bindings {
 
         let design_type = crate::designs::DesignType::from_str(design).ok_or_else(|| {
             PyRuntimeError::new_err(format!(
-                "Unknown design: {}. Available: bars, circular-radial, circular-ring",
+                "Unknown design: {}. Available: bars, circular-radial, circular-ring, frame-perimeter",
                 design
             ))
         })?;
