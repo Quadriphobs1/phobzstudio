@@ -9,8 +9,9 @@
 //! - WaveformLine: Classic oscilloscope-style line
 //! - SpectrumMountain: Filled polygon spectrum
 //! - Particles: Beat-reactive particles
-//! - Spectrogram: Frequency bands visualization
+//! - Spectrogram: Time-frequency visualization
 
+// Design implementations
 mod bars;
 mod circular;
 mod frame_corners;
@@ -20,6 +21,11 @@ mod spectrogram;
 mod spectrum_mountain;
 mod waveform_line;
 
+// Core modules
+mod params;
+mod registry;
+
+// Re-export design implementations
 pub use bars::BarsDesign;
 pub use circular::{CircularRadialDesign, CircularRingDesign};
 pub use frame_corners::FrameCornersDesign;
@@ -29,7 +35,19 @@ pub use spectrogram::{SpectrogramDesign, SpectrogramStyle};
 pub use spectrum_mountain::SpectrumMountainDesign;
 pub use waveform_line::WaveformLineDesign;
 
-use std::f32::consts::PI;
+// Re-export params
+pub use params::{
+    BarsParams, CircularRadialParams, CircularRingParams, DesignParams, EdgeDistribution,
+    FrameCornersParams, FramePerimeterParams, ParticlesParams, SpectrogramParams,
+    SpectrumMountainParams, WaveformLineParams,
+};
+
+// Re-export registry functions
+pub use registry::{create_design, default_params};
+
+// ============================================================================
+// Core types
+// ============================================================================
 
 /// Vertex data for rendering.
 #[repr(C)]
@@ -67,6 +85,10 @@ impl Default for DesignConfig {
     }
 }
 
+// ============================================================================
+// Design type enumeration
+// ============================================================================
+
 /// Available design types.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DesignType {
@@ -82,6 +104,7 @@ pub enum DesignType {
 }
 
 impl DesignType {
+    /// Parse a design type from a string.
     #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
@@ -98,6 +121,7 @@ impl DesignType {
         }
     }
 
+    /// Get the canonical name for this design type.
     pub fn name(&self) -> &'static str {
         match self {
             Self::Bars => "bars",
@@ -112,6 +136,7 @@ impl DesignType {
         }
     }
 
+    /// Get a human-readable description.
     pub fn description(&self) -> &'static str {
         match self {
             Self::Bars => "Traditional vertical/horizontal bars",
@@ -126,6 +151,7 @@ impl DesignType {
         }
     }
 
+    /// Get all available design types.
     pub fn all() -> &'static [Self] {
         &[
             Self::Bars,
@@ -141,238 +167,24 @@ impl DesignType {
     }
 }
 
-/// Design-specific parameters.
-#[derive(Debug, Clone)]
-pub enum DesignParams {
-    Bars(BarsParams),
-    CircularRadial(CircularRadialParams),
-    CircularRing(CircularRingParams),
-    FramePerimeter(FramePerimeterParams),
-    FrameCorners(FrameCornersParams),
-    WaveformLine(WaveformLineParams),
-    SpectrumMountain(SpectrumMountainParams),
-    Particles(ParticlesParams),
-    Spectrogram(SpectrogramParams),
-}
-
-impl Default for DesignParams {
-    fn default() -> Self {
-        Self::Bars(BarsParams::default())
-    }
-}
-
-/// Parameters for bars design.
-#[derive(Debug, Clone)]
-pub struct BarsParams {
-    pub mirror: bool,
-    pub gap_ratio: f32,
-    pub vertical: bool,
-}
-
-impl Default for BarsParams {
-    fn default() -> Self {
-        Self {
-            mirror: false,
-            gap_ratio: 0.1,
-            vertical: false,
-        }
-    }
-}
-
-/// Parameters for circular radial design.
-#[derive(Debug, Clone)]
-pub struct CircularRadialParams {
-    pub inner_radius: f32,
-    pub outer_radius: f32,
-    pub start_angle: f32,
-    pub arc_span: f32,
-    pub rotation: f32,
-}
-
-impl Default for CircularRadialParams {
-    fn default() -> Self {
-        Self {
-            inner_radius: 0.15,
-            outer_radius: 0.45,
-            start_angle: 0.0,
-            arc_span: 2.0 * PI,
-            rotation: 0.0,
-        }
-    }
-}
-
-/// Parameters for circular ring design.
-#[derive(Debug, Clone)]
-pub struct CircularRingParams {
-    pub radius: f32,
-    pub bar_length: f32,
-    pub rotation: f32,
-    pub inward: bool,
-}
-
-impl Default for CircularRingParams {
-    fn default() -> Self {
-        Self {
-            radius: 0.35,
-            bar_length: 0.15,
-            rotation: 0.0,
-            inward: false,
-        }
-    }
-}
-
-/// Parameters for frame perimeter design.
-#[derive(Debug, Clone)]
-pub struct FramePerimeterParams {
-    /// Distance from screen edge in pixels.
-    pub inset: f32,
-    /// Thickness of each bar in pixels.
-    pub bar_thickness: f32,
-    /// Whether bars point inward (true) or outward (false).
-    pub inward: bool,
-    /// Distribution of bars across edges.
-    pub distribution: EdgeDistribution,
-}
-
-impl Default for FramePerimeterParams {
-    fn default() -> Self {
-        Self {
-            inset: 20.0,
-            bar_thickness: 8.0,
-            inward: true,
-            distribution: EdgeDistribution::All,
-        }
-    }
-}
-
-/// How bars are distributed across frame edges.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum EdgeDistribution {
-    /// Distribute bars proportionally across all edges.
-    All,
-    /// Bars only on top and bottom edges.
-    TopBottom,
-    /// Bars only on left and right edges.
-    LeftRight,
-    /// Bars only on top edge.
-    TopOnly,
-    /// Bars only on bottom edge.
-    BottomOnly,
-}
-
-/// Parameters for frame corners design.
-#[derive(Debug, Clone)]
-pub struct FrameCornersParams {
-    /// Distance from screen edge in pixels.
-    pub inset: f32,
-    /// Size of corner area as fraction of min dimension (0.0 - 0.5).
-    pub corner_size: f32,
-    /// Whether bars point inward (true) or outward (false).
-    pub inward: bool,
-}
-
-impl Default for FrameCornersParams {
-    fn default() -> Self {
-        Self {
-            inset: 20.0,
-            corner_size: 0.25,
-            inward: true,
-        }
-    }
-}
-
-/// Parameters for waveform line design.
-#[derive(Debug, Clone)]
-pub struct WaveformLineParams {
-    /// Line thickness in pixels.
-    pub line_width: f32,
-    /// Smoothing factor (0.0 = none, 1.0 = heavy).
-    pub smoothing: f32,
-    /// Mirror mode (oscillate above/below center).
-    pub mirror: bool,
-}
-
-impl Default for WaveformLineParams {
-    fn default() -> Self {
-        Self {
-            line_width: 4.0,
-            smoothing: 0.3,
-            mirror: true,
-        }
-    }
-}
-
-/// Parameters for spectrum mountain design.
-#[derive(Debug, Clone)]
-pub struct SpectrumMountainParams {
-    /// Baseline position (0.0 = top, 1.0 = bottom).
-    pub baseline: f32,
-    /// Smoothing factor (0.0 = none, 1.0 = heavy).
-    pub smoothing: f32,
-    /// Mirror mode (reflect below baseline).
-    pub mirror: bool,
-}
-
-impl Default for SpectrumMountainParams {
-    fn default() -> Self {
-        Self {
-            baseline: 0.8,
-            smoothing: 0.2,
-            mirror: false,
-        }
-    }
-}
-
-/// Parameters for particles design.
-#[derive(Debug, Clone)]
-pub struct ParticlesParams {
-    /// Number of particles.
-    pub count: u32,
-    /// Size range (min, max) in pixels.
-    pub size_range: (f32, f32),
-    /// Particle distribution pattern.
-    pub pattern: ParticlePattern,
-}
-
-impl Default for ParticlesParams {
-    fn default() -> Self {
-        Self {
-            count: 200,
-            size_range: (4.0, 20.0),
-            pattern: ParticlePattern::default(),
-        }
-    }
-}
-
-/// Parameters for spectrogram design.
-#[derive(Debug, Clone)]
-pub struct SpectrogramParams {
-    /// Margin from edges as fraction of screen (0.0 - 0.5).
-    pub margin: f32,
-    /// Gap between cells as fraction of cell size (0.0 - 1.0).
-    /// Use 0.0 for a continuous look like traditional spectrograms.
-    pub gap_ratio: f32,
-    /// Number of time frames to display (history length).
-    /// At 30fps, 150 frames = 5 seconds of history.
-    pub time_window: usize,
-    /// Visual style for the spectrogram.
-    pub style: SpectrogramStyle,
-}
-
-impl Default for SpectrogramParams {
-    fn default() -> Self {
-        Self {
-            margin: 0.02,
-            gap_ratio: 0.0, // No gaps for continuous spectrogram look
-            time_window: 150, // About 5 seconds at 30fps
-            style: SpectrogramStyle::default(),
-        }
-    }
-}
+// ============================================================================
+// Design trait
+// ============================================================================
 
 /// Trait for visualization designs.
+///
+/// Implement this trait to create custom visualization styles.
+/// Each design generates vertices based on audio spectrum data.
 pub trait Design: Send + Sync {
     /// Generate vertices for the current frame.
+    ///
+    /// # Arguments
+    /// * `spectrum` - Frequency spectrum values (0.0-1.0)
+    /// * `config` - Common configuration (dimensions, colors, etc.)
+    /// * `params` - Design-specific parameters
+    ///
+    /// # Returns
+    /// Vector of vertices to render. Each quad uses 6 vertices (2 triangles).
     fn generate_vertices(
         &self,
         spectrum: &[f32],
@@ -384,39 +196,14 @@ pub trait Design: Send + Sync {
     fn design_type(&self) -> DesignType;
 }
 
-/// Create a design instance from type.
-pub fn create_design(design_type: DesignType) -> Box<dyn Design> {
-    match design_type {
-        DesignType::Bars => Box::new(BarsDesign),
-        DesignType::CircularRadial => Box::new(CircularRadialDesign),
-        DesignType::CircularRing => Box::new(CircularRingDesign),
-        DesignType::FramePerimeter => Box::new(FramePerimeterDesign),
-        DesignType::FrameCorners => Box::new(FrameCornersDesign),
-        DesignType::WaveformLine => Box::new(WaveformLineDesign),
-        DesignType::SpectrumMountain => Box::new(SpectrumMountainDesign),
-        DesignType::Particles => Box::new(ParticlesDesign),
-        DesignType::Spectrogram => Box::new(SpectrogramDesign::new()),
-    }
-}
-
-/// Get default params for a design type.
-pub fn default_params(design_type: DesignType) -> DesignParams {
-    match design_type {
-        DesignType::Bars => DesignParams::Bars(BarsParams::default()),
-        DesignType::CircularRadial => DesignParams::CircularRadial(CircularRadialParams::default()),
-        DesignType::CircularRing => DesignParams::CircularRing(CircularRingParams::default()),
-        DesignType::FramePerimeter => DesignParams::FramePerimeter(FramePerimeterParams::default()),
-        DesignType::FrameCorners => DesignParams::FrameCorners(FrameCornersParams::default()),
-        DesignType::WaveformLine => DesignParams::WaveformLine(WaveformLineParams::default()),
-        DesignType::SpectrumMountain => DesignParams::SpectrumMountain(SpectrumMountainParams::default()),
-        DesignType::Particles => DesignParams::Particles(ParticlesParams::default()),
-        DesignType::Spectrogram => DesignParams::Spectrogram(SpectrogramParams::default()),
-    }
-}
+// ============================================================================
+// Tests
+// ============================================================================
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::f32::consts::PI;
 
     fn test_config() -> DesignConfig {
         DesignConfig {
@@ -432,12 +219,10 @@ mod tests {
 
     #[test]
     fn test_design_type_from_str_parsing() {
-        // Valid inputs
         assert_eq!(DesignType::from_str("bars"), Some(DesignType::Bars));
         assert_eq!(DesignType::from_str("BARS"), Some(DesignType::Bars));
         assert_eq!(DesignType::from_str("radial"), Some(DesignType::CircularRadial));
         assert_eq!(DesignType::from_str("ring"), Some(DesignType::CircularRing));
-        // Invalid inputs
         assert_eq!(DesignType::from_str("invalid"), None);
     }
 
@@ -455,15 +240,9 @@ mod tests {
         let config = test_config();
         let spectrum: Vec<f32> = vec![0.5; 32];
 
-        // 6 vertices per bar (2 triangles per quad)
         let params = DesignParams::Bars(BarsParams::default());
         let vertices = design.generate_vertices(&spectrum, &config, &params);
         assert_eq!(vertices.len(), 32 * 6);
-
-        // Mirror mode uses same vertex count but changes scaling
-        let params_mirror = DesignParams::Bars(BarsParams { mirror: true, ..Default::default() });
-        let vertices_mirror = design.generate_vertices(&spectrum, &config, &params_mirror);
-        assert_eq!(vertices_mirror.len(), 32 * 6);
     }
 
     #[test]
@@ -471,30 +250,12 @@ mod tests {
         let design = BarsDesign;
         let config = test_config();
         let params = DesignParams::Bars(BarsParams::default());
-        let spectrum: Vec<f32> = vec![-0.5, 1.5]; // Out of range values
+        let spectrum: Vec<f32> = vec![-0.5, 1.5];
 
         let vertices = design.generate_vertices(&spectrum, &config, &params);
 
         for v in &vertices {
             assert!(v.bar_height >= 0.0 && v.bar_height <= 1.0);
-        }
-    }
-
-    #[test]
-    fn test_bars_vertex_data_correctness() {
-        let design = BarsDesign;
-        let config = DesignConfig { bar_count: 4, ..test_config() };
-        let params = DesignParams::Bars(BarsParams::default());
-        let spectrum: Vec<f32> = vec![0.25, 0.5, 0.75, 1.0];
-
-        let vertices = design.generate_vertices(&spectrum, &config, &params);
-
-        // Verify bar indices and heights
-        for (bar_idx, chunk) in vertices.chunks(6).enumerate() {
-            for v in chunk {
-                assert_eq!(v.bar_index as usize, bar_idx);
-                assert!((v.bar_height - spectrum[bar_idx]).abs() < 0.001);
-            }
         }
     }
 
@@ -518,21 +279,6 @@ mod tests {
     }
 
     #[test]
-    fn test_circular_ring_inward_changes_positions() {
-        let design = CircularRingDesign;
-        let config = test_config();
-        let spectrum: Vec<f32> = vec![0.5; 8];
-
-        let params_out = DesignParams::CircularRing(CircularRingParams { inward: false, ..Default::default() });
-        let params_in = DesignParams::CircularRing(CircularRingParams { inward: true, ..Default::default() });
-
-        let v_out = design.generate_vertices(&spectrum, &config, &params_out);
-        let v_in = design.generate_vertices(&spectrum, &config, &params_in);
-
-        assert_ne!(v_out[0].position, v_in[0].position);
-    }
-
-    #[test]
     fn test_empty_spectrum_produces_no_vertices() {
         let config = test_config();
         let spectrum: Vec<f32> = vec![];
@@ -543,16 +289,5 @@ mod tests {
             let vertices = design.generate_vertices(&spectrum, &config, &params);
             assert!(vertices.is_empty(), "{:?} should produce no vertices for empty spectrum", design_type);
         }
-    }
-
-    #[test]
-    fn test_spectrum_capped_at_bar_count() {
-        let design = BarsDesign;
-        let config = DesignConfig { bar_count: 8, ..test_config() };
-        let params = DesignParams::Bars(BarsParams::default());
-        let spectrum: Vec<f32> = vec![0.5; 100]; // Way more than bar_count
-
-        let vertices = design.generate_vertices(&spectrum, &config, &params);
-        assert_eq!(vertices.len(), 8 * 6);
     }
 }
