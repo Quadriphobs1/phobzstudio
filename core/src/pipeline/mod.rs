@@ -8,24 +8,17 @@ use std::path::Path;
 /// Pipeline configuration for rendering audio visualizations to video.
 #[derive(Debug, Clone)]
 pub struct PipelineConfig {
-    /// Video bitrate in bits per second.
     pub bitrate: u64,
-    /// FFT size for spectrum analysis.
     pub fft_size: usize,
-    /// Waveform color RGB (0.0 - 1.0).
     pub color: [f32; 3],
-    /// Background color RGB (0.0 - 1.0).
     pub background: [f32; 3],
-    /// Video width in pixels.
     pub width: u32,
-    /// Video height in pixels.
     pub height: u32,
-    /// Frames per second.
     pub fps: u32,
-    /// Number of waveform bars.
     pub bar_count: u32,
-    /// Video codec.
     pub codec: VideoCodec,
+    pub mirror: bool,
+    pub glow: bool,
 }
 
 impl Default for PipelineConfig {
@@ -33,19 +26,20 @@ impl Default for PipelineConfig {
         Self {
             bitrate: 8_000_000,
             fft_size: 2048,
-            color: [0.0, 1.0, 0.53], // #00ff88
+            color: [0.0, 1.0, 0.53],
             background: [0.0, 0.0, 0.0],
             width: 1920,
             height: 1080,
             fps: 30,
             bar_count: 64,
             codec: VideoCodec::H264,
+            mirror: false,
+            glow: true,
         }
     }
 }
 
 impl PipelineConfig {
-    /// Convert to RenderConfig for GPU rendering.
     pub fn to_render_config(&self) -> RenderConfig {
         RenderConfig {
             color: self.color,
@@ -54,6 +48,8 @@ impl PipelineConfig {
             height: self.height,
             bar_count: self.bar_count,
             vertical: self.height > self.width,
+            mirror: self.mirror,
+            glow: self.glow,
         }
     }
 

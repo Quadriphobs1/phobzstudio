@@ -46,7 +46,7 @@ mod python_bindings {
 
     /// Render visualization video from audio file.
     #[pyfunction]
-    #[pyo3(signature = (audio_path, output_path, width=1920, height=1080, fps=30, bar_count=64, color="#00ff88", background="#000000", codec="h264", bitrate=8000000, progress_callback=None))]
+    #[pyo3(signature = (audio_path, output_path, width=1920, height=1080, fps=30, bar_count=64, color="#00ff88", background="#000000", codec="h264", bitrate=8000000, mirror=false, glow=true, progress_callback=None))]
     fn render_video(
         py: Python<'_>,
         audio_path: &str,
@@ -59,6 +59,8 @@ mod python_bindings {
         background: &str,
         codec: &str,
         bitrate: u64,
+        mirror: bool,
+        glow: bool,
         progress_callback: Option<Py<PyAny>>,
     ) -> PyResult<()> {
         let color_rgb = pipeline::parse_hex_color(color)
@@ -84,6 +86,8 @@ mod python_bindings {
             codec: video_codec,
             bitrate,
             fft_size: 2048,
+            mirror,
+            glow,
         };
 
         // Create callback wrapper

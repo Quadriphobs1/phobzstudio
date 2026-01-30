@@ -167,11 +167,7 @@ fn test_spectrum_analyzer_db() {
 
     // dB values should be in reasonable range
     for &db in &db_spectrum {
-        assert!(
-            (-80.0..=20.0).contains(&db),
-            "dB value {} out of range",
-            db
-        );
+        assert!((-80.0..=20.0).contains(&db), "dB value {} out of range", db);
     }
 
     // Peak should be higher than average

@@ -25,6 +25,7 @@ def _get_core():
     """Import Rust core module."""
     try:
         import phobz_visualizer
+
         return phobz_visualizer
     except ImportError:
         console.print("[red]Error: Rust core not built. Run 'just build' first.[/red]")
@@ -34,9 +35,7 @@ def _get_core():
 @app.command()
 def render(
     audio: Path = typer.Argument(..., help="Path to audio file (WAV, MP3, FLAC)"),
-    output: Path = typer.Option(
-        Path("output.mp4"), "-o", "--output", help="Output video path"
-    ),
+    output: Path = typer.Option(Path("output.mp4"), "-o", "--output", help="Output video path"),
     platform: str = typer.Option(
         "youtube", "-p", "--platform", help="Platform preset (youtube, shorts, tiktok, instagram)"
     ),
@@ -46,12 +45,10 @@ def render(
     transparent: bool = typer.Option(
         False, "--transparent", help="Render with alpha channel (no background)"
     ),
-    color: str = typer.Option(
-        "#00ff88", "--color", help="Waveform color (hex)"
-    ),
-    bars: int = typer.Option(
-        64, "--bars", help="Number of waveform bars"
-    ),
+    color: str = typer.Option("#00ff88", "--color", help="Waveform color (hex)"),
+    bars: int = typer.Option(64, "--bars", help="Number of waveform bars"),
+    mirror: bool = typer.Option(False, "--mirror", help="Mirror waveform (symmetrical display)"),
+    glow: bool = typer.Option(True, "--glow/--no-glow", help="Enable glow effect"),
 ) -> None:
     """Generate visualization video from audio file."""
     core = _get_core()
@@ -65,7 +62,9 @@ def render(
     try:
         preset = Platform.from_name(platform)
     except ValueError:
-        console.print(f"[red]Error: Unknown platform '{platform}'. Use 'phobz-viz platforms' to list available presets.[/red]")
+        console.print(
+            f"[red]Error: Unknown platform '{platform}'. Use 'phobz-viz platforms' to list available presets.[/red]"
+        )
         raise typer.Exit(1)
 
     console.print(f"[bold green]Phobz Visualizer[/bold green]")
@@ -75,6 +74,8 @@ def render(
     console.print(f"Format: {format}")
     console.print(f"Color: {color}")
     console.print(f"Bars: {bars}")
+    console.print(f"Mirror: {mirror}")
+    console.print(f"Glow: {glow}")
     console.print()
 
     # Background color
@@ -103,6 +104,8 @@ def render(
                 color=color,
                 background=background,
                 codec=format,
+                mirror=mirror,
+                glow=glow,
                 progress_callback=update_progress,
             )
         except Exception as e:
@@ -115,9 +118,7 @@ def render(
 @app.command()
 def analyze(
     audio: Path = typer.Argument(..., help="Path to audio file"),
-    output: Path = typer.Option(
-        Path("analysis.json"), "-o", "--output", help="Output JSON path"
-    ),
+    output: Path = typer.Option(Path("analysis.json"), "-o", "--output", help="Output JSON path"),
 ) -> None:
     """Analyze audio and export data as JSON."""
     core = _get_core()

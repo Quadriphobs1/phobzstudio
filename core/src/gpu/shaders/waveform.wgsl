@@ -8,8 +8,9 @@ struct Uniforms {
     bar_count: f32,
     beat_intensity: f32,
     color: vec3<f32>,
-    // Layout: 0.0 = horizontal bars, 1.0 = vertical bars
     layout_vertical: f32,
+    mirror: f32,
+    glow_enabled: f32,
 }
 
 @group(0) @binding(0)
@@ -34,12 +35,13 @@ fn vs_main(input: VertexInput) -> VertexOutput {
     var output: VertexOutput;
 
     let is_vertical = uniforms.layout_vertical > 0.5;
+    let is_mirror = uniforms.mirror > 0.5;
 
     // Beat-reactive scale effect
     let beat_scale = 1.0 + uniforms.beat_intensity * 0.15;
 
     // Glow expansion (render slightly larger quad for glow effect)
-    let glow_expand = 0.3; // 30% expansion for glow
+    let glow_expand = select(0.0, 0.3, uniforms.glow_enabled > 0.5);
 
     var x: f32;
     var y: f32;
@@ -59,8 +61,11 @@ fn vs_main(input: VertexInput) -> VertexOutput {
         let bar_y = uniforms.height - (input.bar_index + 1.0) * bar_height_px + gap * 0.5;
         let center_bar_y = bar_y + actual_bar_height * 0.5;
 
-        // Bar width scaled by amplitude, centered horizontally
-        let scaled_width = input.bar_height * uniforms.width * 0.8 * beat_scale;
+        // Bar width scaled by amplitude
+        // Mirror mode: bars extend both left and right from center (half width each direction)
+        // Normal mode: full width centered
+        let width_scale = select(0.8, 0.4, is_mirror);
+        let scaled_width = input.bar_height * uniforms.width * width_scale * beat_scale;
         let half_width = scaled_width * 0.5;
         let expanded_half_width = half_width * (1.0 + glow_expand);
         let center_x = uniforms.width * 0.5;
@@ -118,8 +123,11 @@ fn vs_main(input: VertexInput) -> VertexOutput {
         let bar_x = input.bar_index * bar_width + gap * 0.5;
         let center_bar_x = bar_x + actual_bar_width * 0.5;
 
-        // Bar height scaled to viewport, centered vertically
-        let scaled_height = input.bar_height * uniforms.height * 0.8 * beat_scale;
+        // Bar height scaled to viewport
+        // Mirror mode: bars extend both up and down from center (half height each direction)
+        // Normal mode: full height centered
+        let height_scale = select(0.8, 0.4, is_mirror);
+        let scaled_height = input.bar_height * uniforms.height * height_scale * beat_scale;
         let half_height = scaled_height * 0.5;
         let expanded_half_height = half_height * (1.0 + glow_expand);
         let center_y = uniforms.height * 0.5;
@@ -183,6 +191,8 @@ fn vs_main(input: VertexInput) -> VertexOutput {
 
 @fragment
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
+    let glow_on = uniforms.glow_enabled > 0.5;
+
     // Calculate distance from bar edge for glow effect
     let dist_x = abs(input.local_pos.x) - 1.0;
     let dist_y = abs(input.local_pos.y) - 1.0;
@@ -190,6 +200,11 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
 
     // Core bar (inside the original bounds)
     let inside_bar = dist_x <= 0.0 && dist_y <= 0.0;
+
+    // Discard glow pixels when glow is disabled
+    if !inside_bar && !glow_on {
+        discard;
+    }
 
     // Base color
     var color = uniforms.color;
@@ -230,9 +245,11 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
         color = color * glow_boost;
     }
 
-    // Beat-reactive glow intensity
-    let glow_intensity = 1.0 + input.beat_intensity * 0.5;
-    alpha = alpha * glow_intensity;
+    // Beat-reactive glow intensity (only when glow is enabled)
+    if glow_on {
+        let glow_intensity = 1.0 + input.beat_intensity * 0.5;
+        alpha = alpha * glow_intensity;
+    }
 
     // Clamp color to valid range
     color = clamp(color, vec3<f32>(0.0), vec3<f32>(1.0));

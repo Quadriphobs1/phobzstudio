@@ -13,12 +13,16 @@ fn bench_fft_analysis(c: &mut Criterion) {
         let samples = generate_sine(1000.0, SAMPLE_RATE, 1.0, 1.0);
 
         group.throughput(Throughput::Elements(fft_size as u64));
-        group.bench_with_input(BenchmarkId::new("analyze", fft_size), &fft_size, |b, &size| {
-            let mut analyzer = SpectrumAnalyzer::new(size);
-            b.iter(|| {
-                black_box(analyzer.analyze(&samples));
-            });
-        });
+        group.bench_with_input(
+            BenchmarkId::new("analyze", fft_size),
+            &fft_size,
+            |b, &size| {
+                let mut analyzer = SpectrumAnalyzer::new(size);
+                b.iter(|| {
+                    black_box(analyzer.analyze(&samples));
+                });
+            },
+        );
     }
 
     group.finish();

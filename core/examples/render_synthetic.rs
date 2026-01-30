@@ -60,9 +60,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         width,
         height,
         bar_count,
-        color: [0.0, 1.0, 0.53], // #00ff88
+        color: [0.0, 1.0, 0.53],
         background: [0.0, 0.0, 0.0],
         vertical: false,
+        mirror: false,
+        glow: true,
     };
 
     let renderer = WaveformRenderer::new(render_config).await?;

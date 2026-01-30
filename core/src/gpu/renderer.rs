@@ -9,29 +9,27 @@ use wgpu::{BindGroup, Texture, TextureDescriptor, TextureView};
 /// Configuration for rendering.
 #[derive(Debug, Clone)]
 pub struct RenderConfig {
-    /// Bar color RGB (0.0 - 1.0).
     pub color: [f32; 3],
-    /// Background color RGB (0.0 - 1.0).
     pub background: [f32; 3],
-    /// Output width in pixels.
     pub width: u32,
-    /// Output height in pixels.
     pub height: u32,
-    /// Number of bars to display.
     pub bar_count: u32,
-    /// Use vertical layout for 9:16 aspect ratios.
     pub vertical: bool,
+    pub mirror: bool,
+    pub glow: bool,
 }
 
 impl Default for RenderConfig {
     fn default() -> Self {
         Self {
-            color: [0.0, 0.8, 1.0],      // Cyan
-            background: [0.0, 0.0, 0.0], // Black
+            color: [0.0, 0.8, 1.0],
+            background: [0.0, 0.0, 0.0],
             width: 1920,
             height: 1080,
             bar_count: 64,
             vertical: false,
+            mirror: false,
+            glow: true,
         }
     }
 }
@@ -96,6 +94,9 @@ impl WaveformRenderer {
             beat_intensity,
             color: self.config.color,
             layout_vertical: if self.config.vertical { 1.0 } else { 0.0 },
+            mirror: if self.config.mirror { 1.0 } else { 0.0 },
+            glow_enabled: if self.config.glow { 1.0 } else { 0.0 },
+            _padding: [0.0; 2],
         };
         self.ctx.queue.write_buffer(
             &self.pipeline.uniform_buffer,
@@ -261,6 +262,8 @@ mod tests {
             color: [1.0, 0.0, 0.0],
             background: [0.0, 0.0, 0.0],
             vertical: false,
+            mirror: false,
+            glow: true,
         };
 
         let result = WaveformRenderer::new(config.clone()).await;

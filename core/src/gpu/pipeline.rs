@@ -6,18 +6,15 @@ use wgpu::{BindGroup, BindGroupLayout, Buffer, Device, RenderPipeline, TextureFo
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct WaveformUniforms {
-    /// Viewport width in pixels.
     pub width: f32,
-    /// Viewport height in pixels.
     pub height: f32,
-    /// Number of bars to render.
     pub bar_count: f32,
-    /// Beat intensity (0.0 - 1.0) for effects.
     pub beat_intensity: f32,
-    /// Base color RGB.
     pub color: [f32; 3],
-    /// Layout mode: 0.0 = horizontal (16:9), 1.0 = vertical (9:16).
     pub layout_vertical: f32,
+    pub mirror: f32,
+    pub glow_enabled: f32,
+    pub _padding: [f32; 2],
 }
 
 /// Per-bar instance data.

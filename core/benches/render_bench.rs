@@ -6,7 +6,6 @@ use phobz_visualizer::gpu::{RenderConfig, WaveformRenderer};
 fn bench_render_frame(c: &mut Criterion) {
     let mut group = c.benchmark_group("GPU Rendering");
 
-    // Create renderer once (GPU init is slow)
     let config = RenderConfig {
         width: 1920,
         height: 1080,
@@ -14,6 +13,8 @@ fn bench_render_frame(c: &mut Criterion) {
         color: [0.0, 1.0, 0.53],
         background: [0.0, 0.0, 0.0],
         vertical: false,
+        mirror: false,
+        glow: true,
     };
 
     let renderer = match pollster::block_on(WaveformRenderer::new(config)) {
@@ -52,6 +53,8 @@ fn bench_render_resolutions(c: &mut Criterion) {
             color: [0.0, 1.0, 0.53],
             background: [0.0, 0.0, 0.0],
             vertical: false,
+            mirror: false,
+            glow: true,
         };
 
         let renderer = match pollster::block_on(WaveformRenderer::new(config)) {
@@ -61,11 +64,15 @@ fn bench_render_resolutions(c: &mut Criterion) {
 
         let bar_heights: Vec<f32> = (0..64).map(|i| i as f32 / 64.0).collect();
 
-        group.bench_with_input(BenchmarkId::new("render", name), &renderer, |b, renderer| {
-            b.iter(|| {
-                black_box(renderer.render_frame(&bar_heights, 0.5));
-            });
-        });
+        group.bench_with_input(
+            BenchmarkId::new("render", name),
+            &renderer,
+            |b, renderer| {
+                b.iter(|| {
+                    black_box(renderer.render_frame(&bar_heights, 0.5));
+                });
+            },
+        );
     }
 
     group.finish();
@@ -82,6 +89,8 @@ fn bench_bar_counts(c: &mut Criterion) {
             color: [0.0, 1.0, 0.53],
             background: [0.0, 0.0, 0.0],
             vertical: false,
+            mirror: false,
+            glow: true,
         };
 
         let renderer = match pollster::block_on(WaveformRenderer::new(config)) {
@@ -89,7 +98,9 @@ fn bench_bar_counts(c: &mut Criterion) {
             Err(_) => continue,
         };
 
-        let bar_heights: Vec<f32> = (0..bar_count).map(|i| i as f32 / bar_count as f32).collect();
+        let bar_heights: Vec<f32> = (0..bar_count)
+            .map(|i| i as f32 / bar_count as f32)
+            .collect();
 
         group.bench_with_input(
             BenchmarkId::new("render", bar_count),
@@ -105,5 +116,10 @@ fn bench_bar_counts(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_render_frame, bench_render_resolutions, bench_bar_counts);
+criterion_group!(
+    benches,
+    bench_render_frame,
+    bench_render_resolutions,
+    bench_bar_counts
+);
 criterion_main!(benches);

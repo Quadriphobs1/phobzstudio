@@ -27,6 +27,8 @@ def render_video(
     background: str = "#000000",
     codec: str = "h264",
     bitrate: int = 8_000_000,
+    mirror: bool = False,
+    glow: bool = True,
     progress_callback: Callable[[float], None] | None = None,
 ) -> None:
     """Render visualization video from audio file.
@@ -42,6 +44,8 @@ def render_video(
         background: Background color as hex string
         codec: Video codec ("h264", "prores4444", "vp9")
         bitrate: Video bitrate in bits per second
+        mirror: Mirror waveform (symmetrical display)
+        glow: Enable glow effect
         progress_callback: Optional callback function(float) for progress updates
     """
     ...

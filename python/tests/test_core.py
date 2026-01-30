@@ -6,11 +6,13 @@ from pathlib import Path
 
 import pytest
 
+
 @pytest.fixture
 def core():
     """Get the Rust core module if available."""
     try:
         import phobz_visualizer
+
         return phobz_visualizer
     except ImportError:
         pytest.skip("Rust core not built. Run 'just build' first.")
