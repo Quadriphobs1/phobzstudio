@@ -27,6 +27,10 @@ fn test_all_design_types_have_default_params() {
             (DesignType::CircularRadial, DesignParams::CircularRadial(_)) => {}
             (DesignType::CircularRing, DesignParams::CircularRing(_)) => {}
             (DesignType::FramePerimeter, DesignParams::FramePerimeter(_)) => {}
+            (DesignType::FrameCorners, DesignParams::FrameCorners(_)) => {}
+            (DesignType::WaveformLine, DesignParams::WaveformLine(_)) => {}
+            (DesignType::SpectrumMountain, DesignParams::SpectrumMountain(_)) => {}
+            (DesignType::Particles, DesignParams::Particles(_)) => {}
             _ => panic!("Params don't match design type"),
         }
     }
@@ -56,15 +60,23 @@ fn test_all_designs_generate_vertices_for_same_spectrum() {
             design_type
         );
 
-        // All designs should generate 6 vertices per bar (2 triangles)
-        // Except mirrored bars which doubles
-        let expected_base = spectrum.len() * 6;
+        // Different designs have different vertex generation patterns:
+        // - Bar-based: 6 vertices per bar
+        // - Line-based (WaveformLine, SpectrumMountain): 6 vertices per segment (n-1 segments)
+        // - Particles: variable based on energy
+        // - FrameCorners: 2 quads per bar (horizontal + vertical)
+        let min_expected = match design_type {
+            DesignType::WaveformLine | DesignType::SpectrumMountain => (spectrum.len() - 1) * 6,
+            DesignType::Particles => 6, // At least one particle
+            DesignType::FrameCorners => spectrum.len() * 6, // 2 quads per spectrum value, but only bar_count/4 per corner
+            _ => spectrum.len() * 6,
+        };
         assert!(
-            vertices.len() >= expected_base,
+            vertices.len() >= min_expected,
             "Design {:?} generated fewer vertices than expected: {} < {}",
             design_type,
             vertices.len(),
-            expected_base
+            min_expected
         );
     }
 }
@@ -538,6 +550,12 @@ fn test_all_designs_handle_zero_spectrum() {
         let params = default_params(*design_type);
         let vertices = design.generate_vertices(&spectrum, &config, &params);
 
+        // Particles design may skip low-energy particles, so it can return empty
+        if *design_type == DesignType::Particles {
+            // Particles can legitimately be empty with zero spectrum
+            continue;
+        }
+
         // Should still generate vertices even with zero values
         assert!(
             !vertices.is_empty(),
@@ -589,11 +607,20 @@ fn test_high_bar_count_performance() {
         let params = default_params(*design_type);
         let vertices = design.generate_vertices(&spectrum, &config, &params);
 
+        // Different designs have different vertex patterns
+        let min_expected = match design_type {
+            DesignType::WaveformLine | DesignType::SpectrumMountain => (512 - 1) * 6,
+            DesignType::Particles => 6, // At least some particles
+            _ => 512 * 6,
+        };
+
         // Should handle high bar counts
         assert!(
-            vertices.len() >= 512 * 6,
-            "Design {:?} should handle 512 bars",
-            design_type
+            vertices.len() >= min_expected,
+            "Design {:?} should handle 512 bars, got {} vertices (expected >= {})",
+            design_type,
+            vertices.len(),
+            min_expected
         );
     }
 }

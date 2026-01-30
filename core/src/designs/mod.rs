@@ -5,14 +5,26 @@
 //! - CircularRadial: Bars emanating from center
 //! - CircularRing: Bars arranged around a ring
 //! - FramePerimeter: Bars along screen edges
+//! - FrameCorners: Bars positioned at frame corners
+//! - WaveformLine: Classic oscilloscope-style line
+//! - SpectrumMountain: Filled polygon spectrum
+//! - Particles: Beat-reactive particles
 
 mod bars;
 mod circular;
+mod frame_corners;
 mod frame_perimeter;
+mod particles;
+mod spectrum_mountain;
+mod waveform_line;
 
 pub use bars::BarsDesign;
 pub use circular::{CircularRadialDesign, CircularRingDesign};
+pub use frame_corners::FrameCornersDesign;
 pub use frame_perimeter::FramePerimeterDesign;
+pub use particles::{ParticlePattern, ParticlesDesign};
+pub use spectrum_mountain::SpectrumMountainDesign;
+pub use waveform_line::WaveformLineDesign;
 
 use std::f32::consts::PI;
 
@@ -59,6 +71,10 @@ pub enum DesignType {
     CircularRadial,
     CircularRing,
     FramePerimeter,
+    FrameCorners,
+    WaveformLine,
+    SpectrumMountain,
+    Particles,
 }
 
 impl DesignType {
@@ -69,6 +85,10 @@ impl DesignType {
             "circular-radial" | "circularradial" | "radial" => Some(Self::CircularRadial),
             "circular-ring" | "circularring" | "ring" => Some(Self::CircularRing),
             "frame-perimeter" | "frameperimeter" | "perimeter" | "frame" => Some(Self::FramePerimeter),
+            "frame-corners" | "framecorners" | "corners" => Some(Self::FrameCorners),
+            "waveform-line" | "waveformline" | "line" | "oscilloscope" => Some(Self::WaveformLine),
+            "spectrum-mountain" | "spectrummountain" | "mountain" | "area" => Some(Self::SpectrumMountain),
+            "particles" | "particle" => Some(Self::Particles),
             _ => None,
         }
     }
@@ -79,6 +99,10 @@ impl DesignType {
             Self::CircularRadial => "circular-radial",
             Self::CircularRing => "circular-ring",
             Self::FramePerimeter => "frame-perimeter",
+            Self::FrameCorners => "frame-corners",
+            Self::WaveformLine => "waveform-line",
+            Self::SpectrumMountain => "spectrum-mountain",
+            Self::Particles => "particles",
         }
     }
 
@@ -88,11 +112,24 @@ impl DesignType {
             Self::CircularRadial => "Bars emanating outward from center",
             Self::CircularRing => "Bars arranged around a ring",
             Self::FramePerimeter => "Bars along screen edges (overlay)",
+            Self::FrameCorners => "Bars at frame corners",
+            Self::WaveformLine => "Classic oscilloscope-style line",
+            Self::SpectrumMountain => "Filled polygon spectrum",
+            Self::Particles => "Beat-reactive particles",
         }
     }
 
     pub fn all() -> &'static [Self] {
-        &[Self::Bars, Self::CircularRadial, Self::CircularRing, Self::FramePerimeter]
+        &[
+            Self::Bars,
+            Self::CircularRadial,
+            Self::CircularRing,
+            Self::FramePerimeter,
+            Self::FrameCorners,
+            Self::WaveformLine,
+            Self::SpectrumMountain,
+            Self::Particles,
+        ]
     }
 }
 
@@ -103,6 +140,10 @@ pub enum DesignParams {
     CircularRadial(CircularRadialParams),
     CircularRing(CircularRingParams),
     FramePerimeter(FramePerimeterParams),
+    FrameCorners(FrameCornersParams),
+    WaveformLine(WaveformLineParams),
+    SpectrumMountain(SpectrumMountainParams),
+    Particles(ParticlesParams),
 }
 
 impl Default for DesignParams {
@@ -210,6 +251,90 @@ pub enum EdgeDistribution {
     BottomOnly,
 }
 
+/// Parameters for frame corners design.
+#[derive(Debug, Clone)]
+pub struct FrameCornersParams {
+    /// Distance from screen edge in pixels.
+    pub inset: f32,
+    /// Size of corner area as fraction of min dimension (0.0 - 0.5).
+    pub corner_size: f32,
+    /// Whether bars point inward (true) or outward (false).
+    pub inward: bool,
+}
+
+impl Default for FrameCornersParams {
+    fn default() -> Self {
+        Self {
+            inset: 20.0,
+            corner_size: 0.25,
+            inward: true,
+        }
+    }
+}
+
+/// Parameters for waveform line design.
+#[derive(Debug, Clone)]
+pub struct WaveformLineParams {
+    /// Line thickness in pixels.
+    pub line_width: f32,
+    /// Smoothing factor (0.0 = none, 1.0 = heavy).
+    pub smoothing: f32,
+    /// Mirror mode (oscillate above/below center).
+    pub mirror: bool,
+}
+
+impl Default for WaveformLineParams {
+    fn default() -> Self {
+        Self {
+            line_width: 4.0,
+            smoothing: 0.3,
+            mirror: true,
+        }
+    }
+}
+
+/// Parameters for spectrum mountain design.
+#[derive(Debug, Clone)]
+pub struct SpectrumMountainParams {
+    /// Baseline position (0.0 = top, 1.0 = bottom).
+    pub baseline: f32,
+    /// Smoothing factor (0.0 = none, 1.0 = heavy).
+    pub smoothing: f32,
+    /// Mirror mode (reflect below baseline).
+    pub mirror: bool,
+}
+
+impl Default for SpectrumMountainParams {
+    fn default() -> Self {
+        Self {
+            baseline: 0.8,
+            smoothing: 0.2,
+            mirror: false,
+        }
+    }
+}
+
+/// Parameters for particles design.
+#[derive(Debug, Clone)]
+pub struct ParticlesParams {
+    /// Number of particles.
+    pub count: u32,
+    /// Size range (min, max) in pixels.
+    pub size_range: (f32, f32),
+    /// Particle distribution pattern.
+    pub pattern: ParticlePattern,
+}
+
+impl Default for ParticlesParams {
+    fn default() -> Self {
+        Self {
+            count: 200,
+            size_range: (4.0, 20.0),
+            pattern: ParticlePattern::default(),
+        }
+    }
+}
+
 /// Trait for visualization designs.
 pub trait Design: Send + Sync {
     /// Generate vertices for the current frame.
@@ -231,6 +356,10 @@ pub fn create_design(design_type: DesignType) -> Box<dyn Design> {
         DesignType::CircularRadial => Box::new(CircularRadialDesign),
         DesignType::CircularRing => Box::new(CircularRingDesign),
         DesignType::FramePerimeter => Box::new(FramePerimeterDesign),
+        DesignType::FrameCorners => Box::new(FrameCornersDesign),
+        DesignType::WaveformLine => Box::new(WaveformLineDesign),
+        DesignType::SpectrumMountain => Box::new(SpectrumMountainDesign),
+        DesignType::Particles => Box::new(ParticlesDesign),
     }
 }
 
@@ -241,6 +370,10 @@ pub fn default_params(design_type: DesignType) -> DesignParams {
         DesignType::CircularRadial => DesignParams::CircularRadial(CircularRadialParams::default()),
         DesignType::CircularRing => DesignParams::CircularRing(CircularRingParams::default()),
         DesignType::FramePerimeter => DesignParams::FramePerimeter(FramePerimeterParams::default()),
+        DesignType::FrameCorners => DesignParams::FrameCorners(FrameCornersParams::default()),
+        DesignType::WaveformLine => DesignParams::WaveformLine(WaveformLineParams::default()),
+        DesignType::SpectrumMountain => DesignParams::SpectrumMountain(SpectrumMountainParams::default()),
+        DesignType::Particles => DesignParams::Particles(ParticlesParams::default()),
     }
 }
 

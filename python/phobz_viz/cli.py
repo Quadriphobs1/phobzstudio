@@ -50,7 +50,7 @@ def render(
     mirror: bool = typer.Option(False, "--mirror", help="Mirror waveform (symmetrical display)"),
     glow: bool = typer.Option(True, "--glow/--no-glow", help="Enable glow effect"),
     design: str = typer.Option(
-        "bars", "-d", "--design", help="Visualization design (bars, circular-radial, circular-ring, frame-perimeter)"
+        "bars", "-d", "--design", help="Visualization design (bars, circular-radial, circular-ring, frame-perimeter, frame-corners, waveform-line, spectrum-mountain, particles)"
     ),
 ) -> None:
     """Generate visualization video from audio file."""

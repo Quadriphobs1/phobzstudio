@@ -1,6 +1,7 @@
 //! Design-based renderer supporting multiple visualization styles.
 
 use super::context::GpuContext;
+use super::postprocess::{PostProcessConfig, PostProcessPipeline};
 use crate::designs::{create_design, default_params, Design, DesignConfig, DesignParams, DesignType, Vertex};
 use wgpu::{BindGroup, Buffer, RenderPipeline, Texture, TextureView};
 
@@ -51,8 +52,14 @@ pub struct DesignRenderer {
     bind_group: BindGroup,
     uniform_buffer: Buffer,
     vertex_buffer: Buffer,
+    // Scene texture (for post-processing input)
+    scene_texture: Texture,
+    scene_view: TextureView,
+    // Output texture (final result)
     render_texture: Texture,
     render_view: TextureView,
+    // Post-processing pipeline (optional, used when glow is enabled)
+    postprocess: Option<PostProcessPipeline>,
     config: DesignRenderConfig,
     design: Box<dyn Design>,
     max_vertices: usize,
@@ -172,6 +179,25 @@ impl DesignRenderer {
             }],
         });
 
+        // Scene texture (for post-processing input, needs TEXTURE_BINDING for sampling)
+        let scene_texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("design_scene_texture"),
+            size: wgpu::Extent3d {
+                width: config.width,
+                height: config.height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
+
+        let scene_view = scene_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        // Output texture (final result)
         let render_texture = ctx.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("design_render_target"),
             size: wgpu::Extent3d {
@@ -189,6 +215,22 @@ impl DesignRenderer {
 
         let render_view = render_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
+        // Create post-processing pipeline if glow is enabled
+        let postprocess = if config.glow {
+            Some(PostProcessPipeline::new(
+                &ctx.device,
+                PostProcessConfig {
+                    width: config.width,
+                    height: config.height,
+                    bloom_threshold: 0.3,
+                    bloom_intensity: 1.2,
+                    blur_passes: 2,
+                },
+            ))
+        } else {
+            None
+        };
+
         let design = create_design(config.design_type);
 
         Ok(Self {
@@ -198,8 +240,11 @@ impl DesignRenderer {
             bind_group,
             uniform_buffer,
             vertex_buffer,
+            scene_texture,
+            scene_view,
             render_texture,
             render_view,
+            postprocess,
             config,
             design,
             max_vertices,
@@ -255,12 +300,19 @@ impl DesignRenderer {
             label: Some("design_render_encoder"),
         });
 
+        // Render scene to scene_view (or directly to render_view if no post-processing)
+        let target_view = if self.postprocess.is_some() {
+            &self.scene_view
+        } else {
+            &self.render_view
+        };
+
         // Render pass
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("design_render_pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &self.render_view,
+                    view: target_view,
                     resolve_target: None,
                     depth_slice: None,
                     ops: wgpu::Operations {
@@ -283,6 +335,18 @@ impl DesignRenderer {
             render_pass.set_bind_group(0, &self.bind_group, &[]);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.draw(0..vertex_count as u32, 0..1);
+        }
+
+        // Apply post-processing if enabled
+        if let Some(postprocess) = &self.postprocess {
+            postprocess.apply(
+                &self.ctx.device,
+                &self.ctx.queue,
+                &mut encoder,
+                &self.scene_view,
+                &self.render_view,
+                beat_intensity,
+            );
         }
 
         // Copy texture to buffer for readback

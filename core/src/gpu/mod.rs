@@ -6,9 +6,11 @@
 pub mod context;
 pub mod design_renderer;
 pub mod pipeline;
+pub mod postprocess;
 pub mod renderer;
 
 pub use context::{GpuContext, GpuError};
 pub use design_renderer::{DesignRenderConfig, DesignRenderer};
 pub use pipeline::WaveformPipeline;
+pub use postprocess::{PostProcessConfig, PostProcessPipeline};
 pub use renderer::{RenderConfig, WaveformRenderer};
