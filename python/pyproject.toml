@@ -45,6 +45,7 @@ manifest-path = "../core/Cargo.toml"
 python-source = "."
 module-name = "phobz_visualizer"
 features = ["python", "pyo3/extension-module"]
+bindings = "pyo3"
 include = ["phobz_viz/py.typed", "phobz_visualizer.pyi"]
 
 [tool.ruff]

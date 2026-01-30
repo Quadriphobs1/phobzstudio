@@ -9,12 +9,14 @@
 //! - WaveformLine: Classic oscilloscope-style line
 //! - SpectrumMountain: Filled polygon spectrum
 //! - Particles: Beat-reactive particles
+//! - Spectrogram: Frequency bands visualization
 
 mod bars;
 mod circular;
 mod frame_corners;
 mod frame_perimeter;
 mod particles;
+mod spectrogram;
 mod spectrum_mountain;
 mod waveform_line;
 
@@ -23,6 +25,7 @@ pub use circular::{CircularRadialDesign, CircularRingDesign};
 pub use frame_corners::FrameCornersDesign;
 pub use frame_perimeter::FramePerimeterDesign;
 pub use particles::{ParticlePattern, ParticlesDesign};
+pub use spectrogram::{SpectrogramDesign, SpectrogramStyle};
 pub use spectrum_mountain::SpectrumMountainDesign;
 pub use waveform_line::WaveformLineDesign;
 
@@ -75,6 +78,7 @@ pub enum DesignType {
     WaveformLine,
     SpectrumMountain,
     Particles,
+    Spectrogram,
 }
 
 impl DesignType {
@@ -89,6 +93,7 @@ impl DesignType {
             "waveform-line" | "waveformline" | "line" | "oscilloscope" => Some(Self::WaveformLine),
             "spectrum-mountain" | "spectrummountain" | "mountain" | "area" => Some(Self::SpectrumMountain),
             "particles" | "particle" => Some(Self::Particles),
+            "spectrogram" | "spectro" | "frequency" => Some(Self::Spectrogram),
             _ => None,
         }
     }
@@ -103,6 +108,7 @@ impl DesignType {
             Self::WaveformLine => "waveform-line",
             Self::SpectrumMountain => "spectrum-mountain",
             Self::Particles => "particles",
+            Self::Spectrogram => "spectrogram",
         }
     }
 
@@ -116,6 +122,7 @@ impl DesignType {
             Self::WaveformLine => "Classic oscilloscope-style line",
             Self::SpectrumMountain => "Filled polygon spectrum",
             Self::Particles => "Beat-reactive particles",
+            Self::Spectrogram => "Frequency bands (spectrogram style)",
         }
     }
 
@@ -129,6 +136,7 @@ impl DesignType {
             Self::WaveformLine,
             Self::SpectrumMountain,
             Self::Particles,
+            Self::Spectrogram,
         ]
     }
 }
@@ -144,6 +152,7 @@ pub enum DesignParams {
     WaveformLine(WaveformLineParams),
     SpectrumMountain(SpectrumMountainParams),
     Particles(ParticlesParams),
+    Spectrogram(SpectrogramParams),
 }
 
 impl Default for DesignParams {
@@ -335,6 +344,32 @@ impl Default for ParticlesParams {
     }
 }
 
+/// Parameters for spectrogram design.
+#[derive(Debug, Clone)]
+pub struct SpectrogramParams {
+    /// Margin from edges as fraction of screen (0.0 - 0.5).
+    pub margin: f32,
+    /// Gap between cells as fraction of cell size (0.0 - 1.0).
+    /// Use 0.0 for a continuous look like traditional spectrograms.
+    pub gap_ratio: f32,
+    /// Number of time frames to display (history length).
+    /// At 30fps, 150 frames = 5 seconds of history.
+    pub time_window: usize,
+    /// Visual style for the spectrogram.
+    pub style: SpectrogramStyle,
+}
+
+impl Default for SpectrogramParams {
+    fn default() -> Self {
+        Self {
+            margin: 0.02,
+            gap_ratio: 0.0, // No gaps for continuous spectrogram look
+            time_window: 150, // About 5 seconds at 30fps
+            style: SpectrogramStyle::default(),
+        }
+    }
+}
+
 /// Trait for visualization designs.
 pub trait Design: Send + Sync {
     /// Generate vertices for the current frame.
@@ -360,6 +395,7 @@ pub fn create_design(design_type: DesignType) -> Box<dyn Design> {
         DesignType::WaveformLine => Box::new(WaveformLineDesign),
         DesignType::SpectrumMountain => Box::new(SpectrumMountainDesign),
         DesignType::Particles => Box::new(ParticlesDesign),
+        DesignType::Spectrogram => Box::new(SpectrogramDesign::new()),
     }
 }
 
@@ -374,6 +410,7 @@ pub fn default_params(design_type: DesignType) -> DesignParams {
         DesignType::WaveformLine => DesignParams::WaveformLine(WaveformLineParams::default()),
         DesignType::SpectrumMountain => DesignParams::SpectrumMountain(SpectrumMountainParams::default()),
         DesignType::Particles => DesignParams::Particles(ParticlesParams::default()),
+        DesignType::Spectrogram => DesignParams::Spectrogram(SpectrogramParams::default()),
     }
 }
 

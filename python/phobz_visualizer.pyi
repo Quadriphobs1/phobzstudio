@@ -115,3 +115,11 @@ def generate_click_track(
         sample_rate: Sample rate in Hz
     """
     ...
+
+def list_designs() -> list[tuple[str, str]]:
+    """List all available visualization designs.
+
+    Returns:
+        List of (name, description) tuples for each design type.
+    """
+    ...

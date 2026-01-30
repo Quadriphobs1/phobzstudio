@@ -31,6 +31,7 @@ fn test_all_design_types_have_default_params() {
             (DesignType::WaveformLine, DesignParams::WaveformLine(_)) => {}
             (DesignType::SpectrumMountain, DesignParams::SpectrumMountain(_)) => {}
             (DesignType::Particles, DesignParams::Particles(_)) => {}
+            (DesignType::Spectrogram, DesignParams::Spectrogram(_)) => {}
             _ => panic!("Params don't match design type"),
         }
     }
